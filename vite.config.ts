@@ -31,8 +31,6 @@ export default defineConfig({
     tsConfigPaths(),
     tailwindcss(),
     tanstackStart({
-      // Nitro preset that outputs a Vercel Build Output API v3 folder.
-      target: "vercel",
       // Redirect TanStack Start's bundled server entry to src/server.ts (SSR error wrapper).
       server: { entry: "server" },
     }),
@@ -40,4 +38,10 @@ export default defineConfig({
   ],
   define: { __BUILD_STAMP__: JSON.stringify(buildStamp()) },
   server: { host: true, port: 8080 },
+  // A função serverless montada em build.mjs não carrega node_modules ao lado,
+  // então o bundle SSR precisa ser autossuficiente: embute todas as dependências.
+  // Os módulos nativos do Node (node:crypto, node:fs, …) continuam externos.
+  ssr: {
+    noExternal: true,
+  },
 });

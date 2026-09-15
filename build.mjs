@@ -81,16 +81,18 @@ export default async function handler(req, res) {
     if (req.method && req.method !== "GET" && req.method !== "HEAD") {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
-      body = Buffer.concat(chunks);
+      if (chunks.length > 0) body = Buffer.concat(chunks);
     }
 
-    const webRequest = new Request(url, {
+    const init = {
       method: req.method ?? "GET",
       headers,
-      body,
-      // Only relevant when body is a stream, but harmless to include always.
-      duplex: "half",
-    });
+    };
+    if (body !== undefined) {
+      init.body = body;
+      init.duplex = "half";
+    }
+    const webRequest = new Request(url, init);
 
     const response = await (serverEntry.default ?? serverEntry).fetch(
       webRequest,
