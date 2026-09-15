@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.reconcile_stuck_pieces(uuid) FROM authenticated;

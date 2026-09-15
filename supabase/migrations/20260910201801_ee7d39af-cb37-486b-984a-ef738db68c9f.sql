@@ -1,0 +1,1 @@
+ALTER TABLE public.pieces ADD COLUMN IF NOT EXISTS seam_fix_free_used boolean NOT NULL DEFAULT false;
