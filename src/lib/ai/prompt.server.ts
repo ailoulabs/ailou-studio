@@ -162,7 +162,7 @@ export function formatSection(app: AppSpec): string {
   const bg = frame?.backgroundStyle ?? "plain";
 
   if (frame?.accent === "corner") {
-    return `PRODUCT FORMAT: a single flat square panel, aspect ${w}:${h}. ONLY one small motif cluster in the lower-right corner, occupying at most 20% of the width and height; the rest of the panel is completely empty plain background; no frame, no border, no motifs anywhere else. The upper half, the left half and all four edges stay completely empty. Do not draw a napkin, a table, a plate, a mockup or a product photo.`;
+    return `PRODUCT FORMAT: a single flat square napkin design, aspect ${w}:${h}, on a plain calm watercolor-paper ground in the base color. Draw exactly ONE graceful corner bouquet or motif cluster anchored in the lower-right corner, growing inward from that corner, occupying about 25 to 30% of the width and height. The other three corners, the whole center and all four edges stay completely empty plain ground. CRITICAL: draw only ONE single design, never several squares, panels, napkins, frames, a grid or a repeated layout; no border line around the edges. Do not draw a real napkin object, a table, a plate, a mockup or a product photo; the art is flat, seen straight from above, filling the whole image with no white margin.`;
   }
 
   const quietCm = frame?.quietArea
@@ -173,7 +173,8 @@ export function formatSection(app: AppSpec): string {
     // Jogo americano no padrão da loja: moldura recuada, cantos carregados, centro calmo.
     return [
       `PRODUCT FORMAT: a single finished landscape placemat panel artwork, ${w} cm wide by ${h} cm tall, aspect ${w}:${h}, drawn horizontally.`,
-      `COMPOSITION: a decorative frame line or scrollwork border set about 2 cm inside the outer edge, running all the way around; generous bouquets, fruit or foliage clusters anchored in two opposite corners, or smaller clusters in all four corners, spilling slightly over the border line; the whole center is calm, only a very subtle tone-on-tone linen-like texture in the base color; a completely empty plate area of ${quietCm} in the middle with no motifs, no washes and no marks; a short handwritten-style word or a small stamp motif only if the theme clearly calls for it, never over the plate area.`,
+      `COMPOSITION: a decorative frame line or scrollwork border set about 2 cm inside the outer edge, running all the way around; generous bouquets, fruit or foliage clusters anchored in two opposite corners, or smaller clusters in all four corners, spilling slightly over the border line; the whole center is calm, only a very subtle tone-on-tone linen-like texture in the base color; a central resting zone of about ${quietCm} that stays free of motifs, washes and marks, painted in exactly the same background color and paper texture as the rest of the panel; a short handwritten-style word or a small stamp motif only if the theme clearly calls for it, never in the central zone.`,
+      "CRITICAL: the center is only empty background, never a drawn object. Do NOT draw a plate, a dish, a white circle, a white disc, a bright or solid filled shape, a halo or a spotlight in the middle; the central zone must be the very same ground as the rest, just without decoration.",
       "Do not draw any plate, cutlery, napkin, table, mockup or product photo. The artwork is flat, seen straight from above, filling the whole image with no white margin around it.",
     ].join(" ");
   }
