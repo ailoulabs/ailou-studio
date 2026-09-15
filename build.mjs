@@ -57,6 +57,15 @@ await writeFile(
   ) + "\n",
 );
 
+// CRUCIAL: a função é extraída isolada no Vercel, sem o package.json do projeto.
+// Sem "type":"module" aqui, o Node trata os .js do bundle SSR como CommonJS e
+// quebra no `export` → FUNCTION_INVOCATION_FAILED. Este arquivo garante ESM.
+console.log("[build.mjs] Escrevendo package.json (type: module) na função …");
+await writeFile(
+  path.join(outFn, "package.json"),
+  JSON.stringify({ type: "module" }, null, 2) + "\n",
+);
+
 console.log("[build.mjs] Escrevendo wrapper index.mjs (fetch ↔ Node req/res) …");
 const wrapper = `// Ponte entre o Vercel Node runtime (req/res clássico) e o entry Web Fetch
 // do TanStack Start ({ fetch(request, env, ctx) => Response }).
