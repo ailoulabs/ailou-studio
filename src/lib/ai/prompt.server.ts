@@ -135,7 +135,14 @@ export function formatSection(app: AppSpec): string {
       ].join(" ");
     }
     if (position === "both") {
-      return `PRODUCT FORMAT: a square module for a border print with decorative borders along both the top and the bottom edges, each about ${(ratio * 0.4).toFixed(2)} of the height, and a calm quiet center between them; left and right edges must continue into each other so the module repeats horizontally.`;
+      const bandFrac = Math.min(0.38, ratio * 0.4).toFixed(2);
+      return [
+        `PRODUCT FORMAT: a square module for a table-runner border print.`,
+        `A decorative band of motifs runs along the TOP edge and an equally decorated, equally full band runs along the BOTTOM edge, each about ${bandFrac} of the height; the bottom band must be just as finished, detailed and richly painted as the top band, never left empty, faded or unfinished.`,
+        `Between the two bands is a calm center made of a clean, dry watercolor-paper ground in the lightest base color, almost empty, with at most a few very small sparse specks.`,
+        `The center must stay crisp and light: no blurry wash, no out-of-focus flowers, no faded or smeared motifs, and no soft gradient bleeding down from the top band into the center.`,
+        `Left and right edges must continue into each other so the module repeats horizontally, with no motif cut at the sides.`,
+      ].join(" ");
     }
     const trimCm = Number(p["trimCm"] ?? 1.2);
     return [
