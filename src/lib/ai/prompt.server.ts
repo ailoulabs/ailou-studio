@@ -605,9 +605,12 @@ export function buildFromSheetPrompt(input: {
   secondary?: string;
   /** Identidade visual escolhida pelo diretor: tecnica, fundo, layout, paleta. */
   look?: LookSpec;
+  /** Como usar a prancha: lista de pecas (padrao) ou referencia de identidade. */
+  sheetMode?: "parts" | "identity";
 }): string {
   const o = input.overrides ?? {};
   const repeat = input.app.family !== "painel";
+  const identity = input.sheetMode === "identity";
   const blender = blenderKindOf(input.app);
   if (isSolidDotApp(input.app)) {
     return buildSolidDotPrompt({
@@ -632,13 +635,25 @@ export function buildFromSheetPrompt(input: {
       .join("\n\n");
   }
   const allowed = (input.allowedMotifs ?? []).filter(Boolean);
+  const sheetUse = identity
+    ? [
+        "PAINT A COMPLETE, RICH, FINISHED TEXTILE ARTWORK of this collection's subject, composed as an original piece by a professional surface designer, never assembled from stickers.",
+        "The attached image is an IDENTITY REFERENCE, not a parts list. It fixes which species and objects belong to this collection, their exact colours and the hand that drew them, and that identity must be kept faithfully. But do NOT copy its small isolated icons as they are: draw every element again from scratch at full size and full detail, with real overlaps, a wide range of scale from hero to tiny, foreshortening, partial views, elements tucked behind others and elements running off the edges. The sheet says what things ARE; you decide how they are composed.",
+        allowed.length > 0
+          ? `ELEMENTS OF THIS COLLECTION, use these and nothing else: ${allowed.join("; ")}.`
+          : "",
+        repeat ? "Opposite edges must continue into each other so the tile repeats invisibly." : "",
+      ]
+    : [
+        "USE ONLY THE MOTIFS FROM THE PROVIDED SHEET, same brushwork and palette; arrange them in a natural hand-painted textile layout with varied rotation, gentle overlaps between the listed elements and balanced density; opposite edges must continue into each other.",
+        allowed.length > 0 ? `ALLOWED ELEMENTS, nothing else: ${allowed.join("; ")}.` : "",
+        repeat
+          ? "The provided image is a motif reference sheet, not the layout: do not copy its grid, do not keep the empty gaps, do not reproduce it. Redraw the motifs freely across the whole artwork."
+          : "The provided image is a motif reference sheet, not the layout: redraw the motifs inside the requested panel composition.",
+      ];
   return [
     formatSection(input.app, input.secondary),
-    "USE ONLY THE MOTIFS FROM THE PROVIDED SHEET, same brushwork and palette; arrange them in a natural hand-painted textile layout with varied rotation, gentle overlaps between the listed elements and balanced density; opposite edges must continue into each other.",
-    allowed.length > 0 ? `ALLOWED ELEMENTS, nothing else: ${allowed.join("; ")}.` : "",
-    repeat
-      ? "The provided image is a motif reference sheet, not the layout: do not copy its grid, do not keep the empty gaps, do not reproduce it. Redraw the motifs freely across the whole artwork."
-      : "The provided image is a motif reference sheet, not the layout: redraw the motifs inside the requested panel composition.",
+    ...sheetUse,
     "Do not invent new elements and do not invent new colors.",
     input.reinforce ? reinforcementFor(input.app) : "",
     [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),

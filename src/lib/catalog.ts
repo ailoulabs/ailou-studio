@@ -367,14 +367,14 @@ export const APPLICATIONS: Application[] = [
     id: "trilho-de-mesa",
     slug: "trilho-de-mesa",
     name: "Trilho de mesa",
-    family: "barrado",
-    description: "Faixa decorada nas duas pontas e centro calmo para apoiar as travessas.",
+    family: "corrida",
+    description: "Mesma estampa corrida da toalha, cortada mais comprida e estreita.",
     fabricWidthCm: W,
     cutLengthCm: CUT,
     suggestedRole: "coordenado",
     directorRules:
-      "Bordas decoradas nas duas extremidades e centro calmo, quase liso, para não competir com a louça.",
-    params: { bands: 1, bandHeightCm: 50, borderPosition: "both" },
+      "Estampa corrida igual a da toalha de mesa, motivos espalhados por toda a area, sem borda e sem centro vazio. O que muda em relacao a toalha e so o corte, mais comprido e estreito.",
+    params: { layout: "tossed", rapportCm: 30 },
   },
 
   // ---------- Painel ----------

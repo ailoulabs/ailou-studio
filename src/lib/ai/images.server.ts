@@ -1,6 +1,7 @@
 /**
  * Camada de provedor de imagem.
- * Padrão: Nano Banana 2 (Google). A OpenAI fica como reserva por unidade.
+ * Pintor: Nano Banana 2 (Google), e so ele. A OpenAI e LLM, nao pintor:
+ * o GPT-Image so entra pela chave explicita IMAGE_PROVIDER=openai, nunca como socorro.
  */
 
 import {
@@ -25,6 +26,20 @@ export type ImageProvider = "gemini" | "openai";
 /** Provedor padrão, configurável por variável de ambiente. */
 export function imageProvider(): ImageProvider {
   return process.env["IMAGE_PROVIDER"] === "openai" ? "openai" : "gemini";
+}
+
+/**
+ * Como a peca usa a prancha de motivos. Chave do experimento de qualidade.
+ *
+ * "parts": a prancha e uma lista de pecas para copiar. Garante consistencia,
+ *          mas o modelo copia icones pequenos e isolados e a arte sai clip-art.
+ * "identity": a prancha fixa a identidade (especies, cores, mao que desenhou)
+ *          e a peca e pintada como composicao inteira, com sobreposicao,
+ *          escala variada e elementos sangrando na borda.
+ */
+export type SheetMode = "parts" | "identity";
+export function sheetMode(): SheetMode {
+  return process.env["SHEET_MODE"] === "identity" ? "identity" : "parts";
 }
 
 /** Tamanho padrão das peças. 4K dá 347 dpi num rapport de 30 cm. */
@@ -63,10 +78,20 @@ function summarize(err: unknown): string {
 }
 
 /**
- * Recusa definitiva do Google (4xx fora de cota) cai para a OpenAI na hora.
- * Só falha temporária (429, 5xx, tempo esgotado) merece uma segunda tentativa.
+ * Escolhe o pintor. Regra de produto: uma colecao sai de UM pintor so.
+ *
+ * A OpenAI aqui e apenas LLM. O GPT-Image nao entra como socorro automatico:
+ * misturar dois modelos na mesma colecao quebra a coordenacao (foi o que
+ * aconteceu com o poa, que saiu de outro pintor sem ninguem pedir).
+ *
+ * Falha temporaria do Google (429, 5xx, tempo esgotado) ganha novas tentativas.
+ * Recusa definitiva (4xx fora de cota) para na hora. Esgotou, a unidade falha
+ * com o erro do Google e a pessoa decide se recria.
+ *
+ * O caminho openai continua existindo so para a chave explicita
+ * IMAGE_PROVIDER=openai, que e uma escolha deliberada, nunca um fallback.
  */
-async function withFallback(
+async function withProvider(
   gemini: () => Promise<ImageOut>,
   openai: () => Promise<ImageOut>,
   attempts?: ProviderAttempt[],
@@ -95,13 +120,15 @@ async function withFallback(
 
   if (imageProvider() === "openai") return runOpenAi();
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     const started = Date.now();
     try {
       const out = await gemini();
       record({ provider: "gemini", ms: Date.now() - started, ok: true });
       return out;
     } catch (err) {
+      lastError = err;
       record({
         provider: "gemini",
         ms: Date.now() - started,
@@ -112,7 +139,10 @@ async function withFallback(
       if (isPermanentGeminiError(err)) break;
     }
   }
-  return runOpenAi();
+  // Sem socorro de outro pintor: a falha e do Google e fica registrada como tal.
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("O Google não devolveu a imagem. Tente recriar esta peça.");
 }
 
 function fromGemini(run: {
@@ -168,7 +198,7 @@ export async function generateSheet(input: {
       transparent: run.transparent,
     };
   };
-  const out = await withFallback(
+  const out = await withProvider(
     gemini as unknown as () => Promise<ImageOut>,
     openai as unknown as () => Promise<ImageOut>,
     input.attempts,
@@ -191,7 +221,7 @@ export async function generateFromSheet(input: {
     for (const byte of input.sheet) binary += String.fromCharCode(byte);
     return btoa(binary);
   };
-  return withFallback(
+  return withProvider(
     async () =>
       fromGemini(
         await generateImage({
@@ -232,7 +262,7 @@ export async function generateSolid(input: {
   signal?: AbortSignal;
   attempts?: ProviderAttempt[];
 }): Promise<ImageOut> {
-  return withFallback(
+  return withProvider(
     async () =>
       fromGemini(
         await generateImage({
@@ -282,7 +312,7 @@ export async function fixSeamImage(input: {
     for (const byte of bytes) binary += String.fromCharCode(byte);
     return btoa(binary);
   };
-  return withFallback(
+  return withProvider(
     async () =>
       fromGemini(
         await generateImage({
