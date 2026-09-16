@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { BriefForm } from "@/components/studio/BriefForm";
@@ -136,6 +137,7 @@ function flowSignature(palette: string[], shared: string, guidances: string[]): 
 function StudioPage() {
   const { state, dispatch } = useStudio();
   const { colecao } = Route.useSearch();
+  const navigate = useNavigate();
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<JobView | null>(null);
@@ -674,6 +676,19 @@ function StudioPage() {
     }
   }
 
+  /** Comeca uma colecao do zero, sem arrastar nada da anterior. */
+  function handleNewCollection() {
+    dispatch({ type: "reset" });
+    setJob(null);
+    setChosenDir(null);
+    setExploreQuestions([]);
+    setExploreDirs([]);
+    setMotifsFailed(false);
+    jobRef.current = null;
+    void navigate({ to: "/studio", search: {} });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   /** Etapa 1.5: até duas perguntas sobre o que ficou em aberto e três direções. */
   async function handleExplore(answers?: { question: string; answer: string }[]) {
     if (!state.collectionId) {
@@ -1047,12 +1062,23 @@ function StudioPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-8 sm:py-12">
-      <div className="max-w-2xl">
-        <p className="eyebrow">Do primeiro traço à coleção</p>
-        <h1 className="mt-3">Estampas que combinam.</h1>
-        <p className="mt-3 text-base text-muted-foreground">
-          Uma ideia, várias peças para criar juntos.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="eyebrow">Do primeiro traço à coleção</p>
+          <h1 className="mt-3">Estampas que combinam.</h1>
+          <p className="mt-3 text-base text-muted-foreground">
+            Uma ideia, várias peças para criar juntos.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="shrink-0"
+          onClick={handleNewCollection}
+          disabled={busy || generating}
+        >
+          <Plus className="size-4" strokeWidth={1.5} />
+          Nova coleção
+        </Button>
       </div>
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">

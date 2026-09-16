@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import { getApplication, measureLabel } from "@/lib/catalog";
 import { modelLabel, versionSuffix, versionTitle } from "@/lib/collection";
 import type { Brief, Direction, Piece } from "@/lib/collection";
-import { moduleWidthCm, safeFileName } from "@/lib/export/download";
+import { moduleWidthCm, safeFileName, triggerDownload } from "@/lib/export/download";
 import { dpiFor, writePngDpi } from "@/lib/export/png-dpi";
 import { buildFichaTecnica } from "@/lib/export/ficha";
 
@@ -108,10 +108,5 @@ export async function downloadCollectionZip(input: {
   }
 
   const blob = await zip.generateAsync({ type: "blob" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${safeFileName(input.name) || "colecao"}.zip`;
-  link.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, `${safeFileName(input.name) || "colecao"}.zip`);
 }

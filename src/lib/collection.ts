@@ -186,6 +186,14 @@ export const USAGE_NOTE: Partial<Record<Usage, string>> = {
 
 export const DEFAULT_PALETTE = ["#632B4A", "#BB577D", "#FFF8EF", "#3B594A", "#C29957"];
 
+/**
+ * Chips de inspiração da tela inicial.
+ *
+ * Eles nao sao enfeite: sao a primeira ancora criativa que a pessoa recebe, e
+ * por isso precisam cobrir o espectro. Os tres primeiros chips eram todos
+ * delicados, claros e florais, o que empurrava toda colecao para o mesmo lugar.
+ * Agora cada um puxa para uma tecnica, um fundo e um clima diferentes.
+ */
 export const INSPIRATIONS: { label: string; idea: string; palette: string[] }[] = [
   {
     label: "Jardim romântico",
@@ -201,6 +209,31 @@ export const INSPIRATIONS: { label: string; idea: string; palette: string[] }[] 
     label: "Infantil delicado",
     idea: "Bichinhos miúdos, nuvens e estrelinhas em tons suaves, com aparência macia e acolhedora.",
     palette: ["#7C9CC4", "#F3CAC6", "#FFFBF6", "#A8C7A1", "#EBC98A"],
+  },
+  {
+    label: "Boteco e churrasco",
+    idea: "Ferramentas de churrasco, cortes de carne e temperos desenhados a giz branco sobre ardósia preta, com letreiro de açougue.",
+    palette: ["#1A1A1A", "#F5F0E6", "#C0392B", "#8C7853", "#D9C9A3"],
+  },
+  {
+    label: "Festa junina",
+    idea: "Bandeirinhas, espiga de milho, fogueira e balão em chita brasileira, cores cheias e contorno preto forte.",
+    palette: ["#D62828", "#F7B32B", "#2A9D8F", "#FFF4E0", "#1D3557"],
+  },
+  {
+    label: "Azulejo português",
+    idea: "Arabesco de azulejo azul e branco com um ramo de limão siciliano, no capricho da faiança antiga.",
+    palette: ["#1B3A6B", "#FFFFFF", "#7FA9D4", "#E9C46A", "#5C7A4A"],
+  },
+  {
+    label: "Sertão e cordel",
+    idea: "Mandacaru, carcará e casinha de taipa em xilogravura de cordel, preto sobre papel cru, traço grosso de goiva.",
+    palette: ["#1C1C1C", "#E8DCC4", "#B5651D", "#7A6A53", "#A63A2B"],
+  },
+  {
+    label: "Natal da casa",
+    idea: "Pinheirinho, laço e caixa de presente em guache opaco sobre fundo cheio, com xadrez escocês de apoio.",
+    palette: ["#0F5132", "#A31621", "#F2E8D5", "#C9A227", "#3E5C42"],
   },
 ];
 

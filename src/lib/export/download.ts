@@ -22,12 +22,30 @@ export async function downloadPieceImage(
   bitmap.close();
 
   const withDpi = await blobWithDpi(blob, dpi);
-  const url = URL.createObjectURL(withDpi);
+  triggerDownload(withDpi, fileName);
+}
+
+/**
+ * Dispara o download de um blob.
+ *
+ * Dois detalhes que faziam o botao nao fazer nada:
+ * 1. revokeObjectURL logo depois do click() derruba a URL antes de o navegador
+ *    comecar a ler o arquivo. A liberacao tem que esperar.
+ * 2. o link precisa estar dentro da pagina para o clique programatico valer;
+ *    fora do documento, parte dos navegadores ignora.
+ */
+export function triggerDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  // Tempo folgado: o navegador ainda esta lendo o blob quando o clique retorna.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export function safeFileName(name: string): string {

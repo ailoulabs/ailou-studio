@@ -37,6 +37,7 @@ export interface MotifEntry {
 }
 
 export type StudioAction =
+  | { type: "reset" }
   | { type: "setField"; field: "name" | "idea"; value: string }
   | { type: "setStyle"; value: DrawingStyle }
   | { type: "setUsage"; value: Usage }
@@ -115,6 +116,8 @@ function withDirection(pieces: Piece[], direction: Direction): Piece[] {
 }
 
 function reducer(state: StudioState, action: StudioAction): StudioState {
+  // Comecar de novo: volta ao estado inicial, sem arrastar nada da colecao anterior.
+  if (action.type === "reset") return initialStudioState;
   switch (action.type) {
     case "setField":
       return { ...state, brief: { ...state.brief, [action.field]: action.value } };

@@ -243,7 +243,14 @@ export function formatSection(app: AppSpec, secondary?: string): string {
   const bg = frame?.backgroundStyle ?? "plain";
 
   if (frame?.accent === "corner") {
-    return `PRODUCT FORMAT: a single flat square napkin design, aspect ${w}:${h}, on a plain calm linen ground in the base color. Draw exactly ONE graceful corner bouquet or motif cluster anchored in the lower-right corner, growing inward from that corner, occupying about 25 to 30% of the width and height. The other three corners, the whole center and all four edges stay completely empty plain ground. CRITICAL: draw only ONE single design, never several squares, panels, napkins, frames, a grid or a repeated layout; no border line around the edges. Do not draw a real napkin object, a table, a plate, a mockup or a product photo; the art is flat, seen straight from above, filling the whole image with no white margin.`;
+    return [
+      `PRODUCT FORMAT: a single flat square napkin design, aspect ${w}:${h}, on the plain collection ground.`,
+      `Draw exactly ONE generous corner bouquet or motif cluster, anchored in the LOWER-RIGHT CORNER and touching both the bottom edge and the right edge, growing inward and upward from that corner.`,
+      `SIZE, this is the part that usually comes out wrong: the cluster must span about 30% of the width and 30% of the height of the whole image, built from several overlapping motifs at different sizes, not one small isolated element. A single little motif floating in the middle of the napkin is a failure.`,
+      `The other three corners, the whole centre and the top and left edges stay completely empty ground.`,
+      `CRITICAL: draw only ONE single design, never several squares, panels, napkins, frames, a grid or a repeated layout; no border line around the edges.`,
+      `Do not draw a real napkin object, a table, a plate, a mockup or a product photo; the art is flat, seen straight from above, filling the whole image with no white margin.`,
+    ].join(" ");
   }
 
   const quietCm = frame?.quietArea
@@ -255,7 +262,7 @@ export function formatSection(app: AppSpec, secondary?: string): string {
     return [
       `PRODUCT FORMAT: a single finished landscape placemat panel artwork, ${w} cm wide by ${h} cm tall, aspect ${w}:${h}, drawn horizontally.`,
       `FRAME: an ornamental border band set about 2 cm inside the outer edge and running all the way around, bounded on both its outer and its inner side by a pair of thin parallel rules; inside that band, symmetric ${sec || "scrollwork"} drawn in a single accent color of the palette, shaded from a pale wash to a deep saturated tone with clean reserved highlights, with a small medallion centred in each of the four corners and a centred symmetrical motif at the middle of each of the four sides.`,
-      `COMPOSITION: generous bouquets, fruit or foliage clusters sitting in the outer margin between the frame and the image edge, concentrated at two opposite corners or more lightly at all four, running off the image edge where they reach it instead of being tucked neatly inside, and overlapping inward over the outer rule and partly onto the scrollwork; the whole center is calm, only the plain linen ground in the base color; a central resting zone of about ${quietCm} that stays free of motifs, washes and marks, painted in exactly the same background color and linen texture as the rest of the panel; a short handwritten-style word or a small stamp motif only if the theme clearly calls for it, never in the central zone.`,
+      `COMPOSITION: generous bouquets, fruit or foliage clusters sitting in the outer margin between the frame and the image edge, concentrated at two opposite corners or more lightly at all four, running off the image edge where they reach it instead of being tucked neatly inside, and overlapping inward over the outer rule and partly onto the scrollwork; the whole center is calm, only the collection ground, undecorated; a central resting zone of about ${quietCm} that stays free of motifs, washes and marks, painted in exactly the same ground as the rest of the panel. No words, no letters and no lettering anywhere on the panel.`,
       "CRITICAL: the center is only empty background, never a drawn object. Do NOT draw a plate, a dish, a white circle, a white disc, a bright or solid filled shape, a halo or a spotlight in the middle; the central zone must be the very same ground as the rest, just without decoration.",
       "Do not draw any plate, cutlery, napkin, table, mockup or product photo. The artwork is flat, seen straight from above, filling the whole image with no white margin around it.",
     ].join(" ");
