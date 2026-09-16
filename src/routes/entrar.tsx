@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import emblem from "@/assets/ailou-emblem.png.asset.json";
+
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -129,7 +129,7 @@ function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-88px)] max-w-md flex-col justify-center px-4 py-12">
-      <img src={emblem.url} alt="AiLou" className="mx-auto h-24 w-auto" />
+      <img src="/ailou-emblem.png" alt="AiLou" className="mx-auto h-24 w-auto" />
 
       <div className="surface-card mt-8 p-6 sm:p-7">
         {mode === "email" ? (

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { LogOut, Settings2 } from "lucide-react";
-import wordmark from "@/assets/ailou-wordmark.png.asset.json";
+import { formatBuildStamp } from "@/lib/build-stamp";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,13 +17,15 @@ export function SiteHeader() {
   const navigate = useNavigate();
 
   const initials = (user?.email ?? user?.phone ?? "AL").slice(0, 2).toUpperCase();
+  // Versão em execução, para acompanhar se o deploy novo já subiu.
+  const version = formatBuildStamp();
 
   return (
     <header className="sticky top-0 z-40 h-[88px] border-b border-border bg-card">
       <div className="mx-auto flex h-full max-w-[1400px] items-center gap-4 px-4 sm:px-8">
         <Link to="/studio" className="flex min-w-0 items-center gap-4">
           <img
-            src={wordmark.url}
+            src="/ailou-wordmark.png"
             alt="AiLou"
             className="h-9 w-auto shrink-0 sm:h-11"
             loading="eager"
@@ -40,6 +42,18 @@ export function SiteHeader() {
         </Link>
 
         <nav className="ml-auto flex items-center gap-1 sm:gap-4">
+          <span
+            title={`Versão em execução: commit ${version.commit}${version.when ? `, build de ${version.when}` : ""} (horário de Brasília)`}
+            className="mr-1 hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] leading-none text-muted-foreground md:inline-flex"
+          >
+            <span className="font-mono">{version.commit}</span>
+            {version.when && (
+              <>
+                <span className="text-sand">·</span>
+                <span>{version.when}</span>
+              </>
+            )}
+          </span>
           <Link
             to="/studio"
             className="rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:text-primary sm:px-3"
