@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { getApplication, measureLabel } from "@/lib/catalog";
 import { modelLabel, versionSuffix, versionTitle } from "@/lib/collection";
 import type { Brief, Direction, Piece } from "@/lib/collection";
+import type { FlowPiece } from "@/lib/flow-types";
 import { moduleWidthCm, safeFileName, triggerDownload } from "@/lib/export/download";
 import { dpiFor, writePngDpi } from "@/lib/export/png-dpi";
 import { buildFichaTecnica } from "@/lib/export/ficha";
@@ -109,4 +110,39 @@ export async function downloadCollectionZip(input: {
 
   const blob = await zip.generateAsync({ type: "blob" });
   triggerDownload(blob, `${safeFileName(input.name) || "colecao"}.zip`);
+}
+
+/** Pacote do fluxo v0.7: as estampas prontas, com dpi no PNG, e o prompt usado. */
+export async function downloadFlowZip(input: {
+  name: string;
+  pieces: FlowPiece[];
+  prompt: string;
+}): Promise<void> {
+  const zip = new JSZip();
+  const lines: string[] = [`Coleção: ${input.name}`, ""];
+  let count = 0;
+  for (const piece of input.pieces) {
+    const app = getApplication(piece.applicationId);
+    if (!app || !piece.imageUrl) continue;
+    const res = await fetch(piece.imageUrl);
+    if (!res.ok) continue;
+    const blob = await res.blob();
+    const bitmap = await createImageBitmap(blob);
+    const dpi = dpiFor(bitmap.width, moduleWidthCm(app));
+    bitmap.close();
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const prefix =
+      piece.role === "principal"
+        ? "01-principal"
+        : `${String(piece.position + 1).padStart(2, "0")}`;
+    const fileName = `${prefix}-${safeFileName(app.name)}.png`;
+    zip.file(fileName, writePngDpi(bytes, dpi));
+    lines.push(`${fileName}: ${app.name}, ${measureLabel(app)}, ${dpi} dpi`);
+    count += 1;
+  }
+  if (count === 0) throw new Error("Nenhuma estampa pronta para baixar.");
+  lines.push("", "Prompt da peça principal:", "", input.prompt);
+  zip.file("leia-me.txt", lines.join("\n"));
+  const blob = await zip.generateAsync({ type: "blob" });
+  triggerDownload(blob, `${safeFileName(input.name || "colecao")}.zip`);
 }

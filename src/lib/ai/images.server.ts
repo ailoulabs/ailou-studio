@@ -254,6 +254,80 @@ export async function generateFromSheet(input: {
   );
 }
 
+/** Tamanho das peças do fluxo prompt-first: 2K por padrão, rápido para iterar. */
+function promptFlowSize(kind: "principal" | "coordenado"): ImageSize {
+  const raw = process.env[kind === "principal" ? "IMAGE_SIZE_PRINCIPAL" : "IMAGE_SIZE_PIECES"];
+  return raw === "1K" || raw === "2K" || raw === "4K" ? raw : "2K";
+}
+
+function base64Of(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+/**
+ * Fluxo prompt-first (v0.7): a peça principal nasce só do prompt; os
+ * coordenados recebem a principal aprovada como referência de identidade.
+ */
+export async function generateFromPrompt(input: {
+  prompt: string;
+  kind: "principal" | "coordenado";
+  size: SizePair;
+  reference?: Uint8Array;
+  signal?: AbortSignal;
+  attempts?: ProviderAttempt[];
+}): Promise<ImageOut> {
+  const imageSize = promptFlowSize(input.kind);
+  return withProvider(
+    async () =>
+      fromGemini(
+        await generateImage({
+          prompt: input.prompt,
+          aspectRatio: aspectOf(input.size),
+          imageSize,
+          thinkingLevel: "high",
+          ...(input.reference
+            ? { referenceImages: [{ b64: base64Of(input.reference), mime: "image/png" }] }
+            : {}),
+          ...(input.signal ? { signal: input.signal } : {}),
+        }),
+      ),
+    async () => {
+      if (input.reference) {
+        const run = await requestEditFromSheet({
+          key: openAiKey(),
+          prompt: input.prompt,
+          sheet: input.reference,
+          size: input.size,
+          quality: "high",
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          bytes: bytesFromBase64(run.b64),
+          provider: "openai" as const,
+          model: run.model,
+          size: run.size,
+        };
+      }
+      const run = await requestImage({
+        key: openAiKey(),
+        prompt: input.prompt,
+        size: input.size,
+        quality: "high",
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
+      return {
+        bytes: bytesFromBase64(run.b64),
+        provider: "openai" as const,
+        model: run.model,
+        size: run.size,
+      };
+    },
+    input.attempts,
+  );
+}
+
 /** Coordenados sólidos: poá, vichy e listras, sem referência. */
 export async function generateSolid(input: {
   prompt: string;

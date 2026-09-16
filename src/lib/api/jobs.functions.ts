@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type UnitKind = "prancha" | "peca" | "emenda" | "variante";
+export type UnitKind = "prancha" | "peca" | "emenda" | "variante" | "principal" | "coordenado";
 
 export interface JobUnitView {
   id: string;
@@ -252,7 +252,7 @@ export const enqueueUnit = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       pieceId: uuid,
-      kind: z.enum(["peca", "emenda"]),
+      kind: z.enum(["peca", "emenda", "principal", "coordenado"]),
       hiFi: z.boolean().optional(),
       reinforce: z.boolean().optional(),
     }).parse,
@@ -336,6 +336,102 @@ export const enqueueVariants = createServerFn({ method: "POST" })
     return { jobId, total: alvos.length };
   });
 
+
+// ------------------------------------------------------------------
+// Fluxo prompt-first (v0.7)
+// ------------------------------------------------------------------
+
+/** Pinta (ou repinta) a peça principal a partir do prompt salvo na coleção. */
+export const startPrincipal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ collectionId: uuid }).parse)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { reconcileStuckPieces } = await import("@/lib/jobs/engine.server");
+
+    const { data: collection, error } = await supabase
+      .from("collections")
+      .select("id, direction, pieces(id, role)")
+      .eq("id", data.collectionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!collection) throw new Error("Coleção não encontrada.");
+    const direction = (collection.direction ?? {}) as { masterPrompt?: string };
+    if (!String(direction.masterPrompt ?? "").trim()) {
+      throw new Error("Escreva o prompt da peça principal antes de pintar.");
+    }
+    const principal = ((collection.pieces ?? []) as { id: string; role: string }[]).find(
+      (p) => p.role === "principal",
+    );
+    if (!principal) throw new Error("Esta coleção não tem peça principal.");
+
+    await reconcileStuckPieces(collection.id);
+    await supabase.from("collections").update({ status: "montagem" }).eq("id", collection.id);
+
+    const jobId = await enqueue({
+      collectionId: collection.id,
+      userId,
+      units: [
+        {
+          kind: "principal",
+          pieceId: principal.id,
+          dedupeKey: `principal:${principal.id}`,
+        },
+      ],
+      baseUrl: await currentBaseUrl(),
+    });
+    return { jobId, pieceId: principal.id };
+  });
+
+/** Pinta os coordenados usando a peça principal aprovada como referência. */
+export const startCoordinates = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ collectionId: uuid, recreateAll: z.boolean().optional() }).parse)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { reconcileStuckPieces } = await import("@/lib/jobs/engine.server");
+
+    const { data: collection, error } = await supabase
+      .from("collections")
+      .select("id, pieces(id, role, position, image_path)")
+      .eq("id", data.collectionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!collection) throw new Error("Coleção não encontrada.");
+
+    const pieces = [
+      ...((collection.pieces ?? []) as {
+        id: string;
+        role: string;
+        position: number;
+        image_path: string | null;
+      }[]),
+    ].sort((a, b) => a.position - b.position);
+    const principal = pieces.find((p) => p.role === "principal");
+    if (!principal?.image_path) throw new Error("Aprove a peça principal antes dos coordenados.");
+
+    await reconcileStuckPieces(collection.id);
+
+    const units: PendingUnit[] = [];
+    for (const piece of pieces) {
+      if (piece.role === "principal") continue;
+      if (piece.image_path && data.recreateAll !== true) continue;
+      units.push({ kind: "coordenado", pieceId: piece.id, dedupeKey: `coordenado:${piece.id}` });
+    }
+    if (units.length === 0) throw new Error("Todas as peças já estão prontas.");
+
+    await supabase.from("collections").update({ status: "montagem" }).eq("id", collection.id);
+
+    const jobId = await enqueue({
+      collectionId: collection.id,
+      userId,
+      units,
+      baseUrl: await currentBaseUrl(),
+    });
+    return { jobId, total: units.length };
+  });
 
 /** Pede para parar depois das peças que já começaram. */
 export const cancelJob = createServerFn({ method: "POST" })

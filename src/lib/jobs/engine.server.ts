@@ -10,6 +10,7 @@
 import { base64FromBytes, openAiKey } from "@/lib/ai/openai.server";
 import {
   fixSeamImage,
+  generateFromPrompt,
   generateFromSheet,
   sheetMode,
   generateSheet,
@@ -17,6 +18,7 @@ import {
   type ImageOut,
   type ProviderAttempt,
 } from "@/lib/ai/images.server";
+import { findClimate } from "@/lib/studio-flow";
 import { BUILD_STAMP } from "@/lib/build-stamp";
 import {
   GROUNDS,
@@ -39,7 +41,7 @@ import {
 
 
 
-export type UnitKind = "prancha" | "peca" | "emenda" | "variante";
+export type UnitKind = "prancha" | "peca" | "emenda" | "variante" | "principal" | "coordenado";
 export type UnitStatus = "fila" | "rodando" | "ok" | "erro" | "cancelada";
 
 export type VariantLabel = "xadrez" | "listras" | "outra-cor";
@@ -759,6 +761,173 @@ export async function runPieceUnit(input: {
   }
 }
 
+// ------------------------------------------------------------------
+// Fluxo prompt-first (v0.7): principal a partir do prompt, coordenados a
+// partir da principal aprovada. Sem prancha, sem conferência, sem conserto.
+// ------------------------------------------------------------------
+
+export async function runPromptUnit(input: {
+  pieceId: string;
+  userId: string;
+  kind: "principal" | "coordenado";
+  signal: AbortSignal;
+}): Promise<void> {
+  const db = await admin();
+  const { imageSizeFor } = await import("@/lib/ai/prompt.server");
+  const { buildPrincipalPrompt, buildCoordinatePrompt } = await import(
+    "@/lib/ai/master-prompt.server"
+  );
+
+  const { data: piece, error } = await db
+    .from("pieces")
+    .select("*, collections!inner(*)")
+    .eq("id", input.pieceId)
+    .maybeSingle();
+  if (error) throw new Error("Não foi possível ler a peça.");
+  if (!piece) throw new Error("Peça não encontrada.");
+  const collection = (piece as unknown as { collections: Record<string, unknown> }).collections;
+  if (collection["user_id"] !== input.userId) throw new Error("Peça não encontrada.");
+
+  const { data: app } = await db
+    .from("applications")
+    .select("*")
+    .eq("id", piece.application_id)
+    .maybeSingle();
+  if (!app) throw new Error("Aplicação não encontrada no catálogo.");
+
+  const previousStatus = String(piece.status ?? "pendente");
+  const previousImage = piece.image_path;
+
+  const marked = await db
+    .from("pieces")
+    .update({ status: "gerando", error: null, seam: null, composition: null })
+    .eq("id", piece.id);
+  assertWrite(marked.error, "Não foi possível marcar a peça como em geração.");
+
+  const direction = (collection["direction"] ?? {}) as { masterPrompt?: string };
+  const brief = (collection["brief"] ?? {}) as { adjustments?: string[]; climate?: string };
+  const master = String(direction.masterPrompt ?? "").trim();
+  if (!master) throw new Error("Esta coleção ainda não tem o prompt da peça principal.");
+  const palette = ((collection["palette"] as string[]) ?? []).filter(Boolean);
+  const spec = {
+    family: app.family as "corrida" | "barrado" | "painel",
+    fabric_width_cm: Number(app.fabric_width_cm),
+    cut_length_cm: Number(app.cut_length_cm),
+    params: (app.params ?? {}) as Record<string, unknown>,
+    slug: app.slug,
+  };
+
+  let prompt: string;
+  let reference: Uint8Array | undefined;
+  let size = imageSizeFor(spec);
+
+  if (input.kind === "principal") {
+    prompt = buildPrincipalPrompt(master, brief.adjustments ?? []);
+    size = { modern: "2560x2560", legacy: "1024x1024" };
+  } else {
+    const built = buildCoordinatePrompt({
+      app: spec,
+      pieceName: String(app.name),
+      role: String(piece.role ?? "coordenado"),
+      masterPrompt: master,
+      palette,
+      soft: findClimate(brief.climate)?.soft === true,
+    });
+    prompt = built.prompt;
+    if (built.needsReference) {
+      const { data: principal } = await db
+        .from("pieces")
+        .select("image_path")
+        .eq("collection_id", piece.collection_id)
+        .eq("role", "principal")
+        .not("image_path", "is", null)
+        .limit(1)
+        .maybeSingle();
+      const principalPath = principal?.image_path;
+      if (!principalPath) throw new Error("Aprove a peça principal antes dos coordenados.");
+      const file = await db.storage.from("pieces").download(principalPath);
+      if (file.error || !file.data) throw new Error("A peça principal não foi encontrada.");
+      reference = new Uint8Array(await file.data.arrayBuffer());
+    }
+  }
+
+  const startedAt = Date.now();
+  try {
+    const attempts: ProviderAttempt[] = [];
+    const out = await withDeadline(GEN_HARD_MS, "A geração", (signal) =>
+      generateFromPrompt({
+        prompt,
+        kind: input.kind,
+        size,
+        ...(reference ? { reference } : {}),
+        signal,
+        attempts,
+      }),
+    );
+
+    // Cada versão da principal ganha caminho próprio: a artesã pode voltar.
+    const stamp = Date.now().toString(36);
+    const path =
+      input.kind === "principal"
+        ? `${input.userId}/${piece.collection_id}/${piece.id}-v${stamp}.png`
+        : `${input.userId}/${piece.collection_id}/${piece.id}.png`;
+    const up = await db.storage
+      .from("pieces")
+      .upload(path, out.bytes, { contentType: "image/png", upsert: true });
+    if (up.error) throw new Error("Não foi possível salvar a imagem gerada.");
+
+    if (input.kind === "principal") {
+      await saveVersion(db, {
+        pieceId: piece.id,
+        collectionId: String(piece.collection_id),
+        kind: "variante",
+        label: `v${stamp}`,
+        imagePath: path,
+      });
+    }
+
+    const timings = {
+      generateMs: Date.now() - startedAt,
+      totalMs: Date.now() - startedAt,
+      provider: out.provider,
+      model: out.model,
+      size: out.size,
+      build: BUILD_STAMP,
+      flow: "prompt",
+      attempts,
+      ...(out.width && out.height ? { pixels: `${out.width}x${out.height}` } : {}),
+    };
+
+    const saved = await db
+      .from("pieces")
+      .update({
+        status: "pronta",
+        image_path: path,
+        prompt,
+        error: null,
+        made_by: "ia",
+        image_print_path: null,
+        print_dpi: null,
+        composition: null,
+        seam: null,
+        timings: timings as never,
+      })
+      .eq("id", piece.id);
+    assertWrite(saved.error, "Não foi possível registrar a peça pronta.");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Falha ao gerar a estampa.";
+    await db
+      .from("pieces")
+      .update(
+        previousImage
+          ? { status: previousStatus === "pronta" ? "pronta" : "erro", error: message }
+          : { status: "erro", error: message },
+      )
+      .eq("id", piece.id);
+    throw new Error(message);
+  }
+}
+
 /** Conserto de emenda pedido pela artesã. Nunca sobrescreve a arte original. */
 export async function runSeamFixUnit(input: {
   pieceId: string;
@@ -1112,6 +1281,10 @@ async function runUnit(unit: UnitRow, userId: string, signal: AbortSignal): Prom
     });
     return;
   }
+  if (unit.kind === "principal" || unit.kind === "coordenado") {
+    await runPromptUnit({ pieceId: unit.piece_id, userId, kind: unit.kind, signal });
+    return;
+  }
 
   await runPieceUnit({
     pieceId: unit.piece_id,
@@ -1238,7 +1411,7 @@ async function weightsFor(
     }
   }
   return units.map((u) => {
-    if (u.kind === "peca" || u.kind === "variante") {
+    if (u.kind === "peca" || u.kind === "variante" || u.kind === "coordenado") {
       return u.piece_id && lightPieces.has(u.piece_id) ? 1 : 2;
     }
     return 2;
@@ -1305,11 +1478,12 @@ async function finalizeJob(
     .eq("collection_id", job.collection_id);
   const total = (pieces ?? []).length;
   const ready = (pieces ?? []).filter((p) => p.status === "pronta").length;
+  const broken = (pieces ?? []).filter((p) => p.status === "erro").length;
   if (total === 0) return;
-  await db
-    .from("collections")
-    .update({ status: ready === total ? "pronta" : "pronta_com_falhas" })
-    .eq("id", job.collection_id);
+  // Peças ainda não pedidas (só a principal pintada) não são falha: a coleção segue em montagem.
+  const collectionStatus =
+    ready === total ? "pronta" : broken > 0 ? "pronta_com_falhas" : "montagem";
+  await db.from("collections").update({ status: collectionStatus }).eq("id", job.collection_id);
 }
 
 /**
@@ -1354,7 +1528,7 @@ export async function processJobSlice(
     .from("generation_units")
     .select("kind")
     .eq("job_id", jobId)
-    .in("kind", ["prancha", "peca"])
+    .in("kind", ["prancha", "peca", "principal", "coordenado"])
     .limit(1);
   const touchesCollection = (kinds ?? []).length > 0;
 

@@ -551,7 +551,7 @@ export function buildSolidDotPrompt(input: {
 }
 
 /** Prompt de cada coordenado pintado, com proporções em porcentagem do rapport. */
-function blenderPrompt(app: AppSpec, layout: string, style?: string): string {
+export function blenderPrompt(app: AppSpec, layout: string, style?: string): string {
   const p = app.params ?? {};
   // Aquarela pede borda mole; azulejo, jeans e afins pedem borda reta.
   const stripeEdge = isModelledStyle(style)
