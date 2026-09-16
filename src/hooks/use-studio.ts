@@ -1,5 +1,6 @@
 import { useReducer } from "react";
 import {
+  INSPIRATIONS,
   makeDirection,
   makePiece,
   piecesForUsage,
@@ -47,7 +48,7 @@ export type StudioAction =
   | { type: "setRequiredColor"; index: number; value: string }
   | { type: "addRequiredColor" }
   | { type: "removeRequiredColor"; index: number }
-  | { type: "applyInspiration"; idea: string; palette: string[] }
+  | { type: "applyInspiration"; label: string; idea: string; palette: string[] }
   | { type: "addPiece"; applicationId: string }
   | { type: "removePiece"; id: string }
   | { type: "elaborate" }
@@ -154,11 +155,22 @@ function reducer(state: StudioState, action: StudioAction): StudioState {
       const required = (state.brief.requiredColors ?? []).filter((_, i) => i !== action.index);
       return { ...state, brief: { ...state.brief, requiredColors: required } };
     }
-    case "applyInspiration":
+    case "applyInspiration": {
+      // O nome vem junto, mas sem atropelar o que a pessoa escreveu: so preenche
+      // quando esta vazio ou quando o nome atual veio de outro chip.
+      const digitado = state.brief.name.trim();
+      const veioDeChip = INSPIRATIONS.some((i) => i.label === digitado);
+      const name = digitado === "" || veioDeChip ? action.label : state.brief.name;
       return {
         ...state,
-        brief: { ...state.brief, idea: action.idea, preferredColors: action.palette },
+        brief: {
+          ...state.brief,
+          name,
+          idea: action.idea,
+          preferredColors: action.palette,
+        },
       };
+    }
     case "addPiece": {
       const piece = makePiece(action.applicationId);
       if (!piece) return state;

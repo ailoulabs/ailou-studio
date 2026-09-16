@@ -132,7 +132,12 @@ export function BriefForm({ state, dispatch, onElaborate, busy }: Props) {
                 key={chip.label}
                 type="button"
                 onClick={() =>
-                  dispatch({ type: "applyInspiration", idea: chip.idea, palette: chip.palette })
+                  dispatch({
+                    type: "applyInspiration",
+                    label: chip.label,
+                    idea: chip.idea,
+                    palette: chip.palette,
+                  })
                 }
                 className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-sand hover:bg-secondary hover:text-primary"
               >

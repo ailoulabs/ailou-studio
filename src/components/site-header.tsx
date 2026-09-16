@@ -43,18 +43,16 @@ export function SiteHeader() {
 
         <nav className="ml-auto flex items-center gap-1 sm:gap-4">
           <span
-            title={`${version.label}, commit ${version.commit}${version.when ? `, build de ${version.when}` : ""} (horário de Brasília)`}
-            className="mr-1 hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] leading-none text-muted-foreground md:inline-flex"
+            title={[
+              version.label,
+              `commit ${version.commit}`,
+              version.when ? `build de ${version.when}, horário de Brasília` : "",
+            ]
+              .filter(Boolean)
+              .join("\n")}
+            className="mr-1 hidden cursor-default rounded-full border border-border px-2.5 py-1 text-[11px] font-medium leading-none text-muted-foreground md:inline-block"
           >
-            <span className="font-medium text-primary">{version.label}</span>
-            <span className="text-sand">·</span>
-            <span className="font-mono">{version.commit}</span>
-            {version.when && (
-              <>
-                <span className="text-sand">·</span>
-                <span>{version.when}</span>
-              </>
-            )}
+            {version.label}
           </span>
           <Link
             to="/studio"
