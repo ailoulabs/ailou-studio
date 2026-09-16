@@ -553,6 +553,17 @@ function StudioPage() {
     setJob(current);
     if (ACTIVE_JOB.has(current.status)) {
       await loadCollection(collectionId);
+      // O banco diz "pronta" com a imagem antiga enquanto a peca e refeita: so o
+      // job sabe. Por isso o job manda na tela: o que esta na fila ou rodando
+      // fica esmaecido, para a imagem antiga nao parecer final.
+      for (const u of current.units) {
+        if (!u.pieceId) continue;
+        if (u.status === "rodando") {
+          dispatch({ type: "setPieceResult", id: u.pieceId, status: "gerando", stage: "Refazendo…" });
+        } else if (u.status === "fila") {
+          dispatch({ type: "setPieceResult", id: u.pieceId, status: "gerando", stage: "Na fila…" });
+        }
+      }
       return;
     }
     if (settledJob.current !== current.id) await settleResult(current, collectionId);
@@ -995,6 +1006,21 @@ function StudioPage() {
   const units: JobUnitView[] = job?.units ?? [];
   const pieceUnits = units.filter((u) => u.kind !== "prancha");
   const doneUnits = pieceUnits.filter((u) => u.status === "ok" || u.status === "erro").length;
+
+  // Titulo da aba acompanha a geracao: da para ver o progresso de outra aba.
+  useEffect(() => {
+    const base = "AiLou Studio";
+    if (generating && pieceUnits.length > 0) {
+      document.title = `Gerando ${Math.min(doneUnits + 1, pieceUnits.length)}/${pieceUnits.length} · ${base}`;
+    } else if (generating) {
+      document.title = `Gerando… · ${base}`;
+    } else {
+      document.title = base;
+    }
+    return () => {
+      document.title = base;
+    };
+  }, [generating, doneUnits, pieceUnits.length]);
   const runningUnits = pieceUnits.filter((u) => u.status === "rodando").length;
   const sheetPending = units.some((u) => u.kind === "prancha" && u.status !== "ok");
   const started = Boolean(job?.startedAt);

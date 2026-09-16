@@ -4,7 +4,14 @@ import { toast } from "sonner";
 import { LayoutPreview } from "@/components/studio/LayoutPreview";
 import { Spinner } from "@/components/ui/spinner";
 import { measureLabel, type Application } from "@/lib/catalog";
-import { modelLabel, roleLabel, versionSuffix, versionTitle, type Piece } from "@/lib/collection";
+import {
+  modelLabel,
+  roleLabel,
+  sheetModeLabel,
+  versionSuffix,
+  versionTitle,
+  type Piece,
+} from "@/lib/collection";
 import { downloadPieceImage, safeFileName } from "@/lib/export/download";
 import { cn } from "@/lib/utils";
 
@@ -155,6 +162,14 @@ export function PatternCard({
           {measureLabel(app)}
           {modelLabel(piece.timings) ? ` · ${modelLabel(piece.timings)}` : ""}
         </p>
+        {sheetModeLabel(piece.timings) && (
+          <p
+            className="text-xs text-muted-foreground"
+            title={piece.timings?.build ? `build ${piece.timings.build}` : undefined}
+          >
+            Modo: {sheetModeLabel(piece.timings)}
+          </p>
+        )}
 
         {versions.length > 0 && (
           <div className="flex flex-wrap gap-1" role="group" aria-label="Versões desta estampa">

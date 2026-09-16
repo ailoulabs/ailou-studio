@@ -72,10 +72,21 @@ export interface Piece {
     quality?: string;
     size?: string;
     pixels?: string;
+    /** Como a peca usou a prancha: "parts" ou "identity". */
+    sheetMode?: string;
+    /** Build que gerou a peca, para saber de qual deploy ela veio. */
+    build?: string;
   };
 
   /** Outras versões da mesma peça: conserto de emenda, xadrez, listras, outra cor. */
   versions?: PieceVersion[];
+}
+
+/** Modo da prancha que gerou a peça, para a tela. Nulo quando não se aplica. */
+export function sheetModeLabel(timings?: Piece["timings"]): string | null {
+  if (timings?.sheetMode === "identity") return "prancha como identidade";
+  if (timings?.sheetMode === "parts") return "prancha como lista";
+  return null;
 }
 
 /** Nome amigável do desenhista de imagem usado na peça. */
