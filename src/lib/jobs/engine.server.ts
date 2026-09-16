@@ -238,6 +238,7 @@ export async function runSheetUnit(input: {
     motifs: motifsEn,
     fillers: direction.fillers ?? [],
     styleDescription: styleDescription(String(brief["style"] ?? "")),
+    style: String(brief["style"] ?? ""),
     sharedDirection: direction.shared ?? "",
     palette,
   };
@@ -482,6 +483,7 @@ export async function runPieceUnit(input: {
     pieceGuidance: guidance,
     overrides: (piece.overrides ?? {}) as Record<string, number | string>,
     palette,
+    style: String((collection["brief"] as Record<string, unknown> | null)?.["style"] ?? ""),
     ...(allowedMotifs.length > 0 ? { allowedMotifs } : {}),
     ...(input.reinforce ? { reinforce: true } : {}),
   });
@@ -820,7 +822,7 @@ export async function runVariantUnit(input: {
   const { data: piece, error } = await db
     .from("pieces")
     .select(
-      "*, collections!inner(user_id, palette, direction, motifs, motif_sheet_path, motif_sheet_filtered_path)",
+      "*, collections!inner(user_id, palette, direction, motifs, brief, motif_sheet_path, motif_sheet_filtered_path)",
     )
     .eq("id", input.pieceId)
     .maybeSingle();
@@ -832,6 +834,7 @@ export async function runVariantUnit(input: {
       palette: string[] | null;
       direction: Record<string, unknown> | null;
       motifs: unknown;
+      brief: Record<string, unknown> | null;
       motif_sheet_path: string | null;
       motif_sheet_filtered_path: string | null;
     };
@@ -910,6 +913,7 @@ export async function runVariantUnit(input: {
         pieceGuidance: `${guidance} ${ground}`,
         overrides: (piece.overrides ?? {}) as Record<string, number | string>,
         palette: variantPalette,
+        style: String(parent.brief?.["style"] ?? ""),
         ...(allowedMotifs.length > 0 ? { allowedMotifs } : {}),
       }),
       sheet: new Uint8Array(await sheet.data.arrayBuffer()),

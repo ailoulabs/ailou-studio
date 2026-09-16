@@ -53,6 +53,38 @@ const BLENDER_CONTRAST = [
   "a maximum difference between mark and ground, full solid colors",
 ];
 
+/**
+ * Acabamento comercial, extraido da colecao de referencia da Casa Criativa.
+ * A arte real tem duas camadas: um fundo de linho com trama impressa na propria
+ * arte, e os motivos pintados por cima, opacos, onde a trama para na borda.
+ */
+const MOTIF_RENDERING =
+  "MOTIF RENDERING, commercial botanical quality: paint every element as a finished botanical watercolor illustration with real volume, never a flat silhouette. Light falls from one side, so each fruit and petal has a lit side, a deeper warmer shaded side and a soft highlight. Show the internal detail: petal veining and visible stamens in the flowers, the vertical crease and the soft fuzz of the fruit, the midrib and the turned edge of the leaves, the woody grain of the branch. Edges are confident and defined, never dissolved, never blurry, never out of focus. Translucent petals may overlap and let the layer beneath show through. Keep a strong scale contrast: one or two hero motifs clearly larger, surrounded by much smaller buds, berries and single leaves.";
+
+const LINEN_GROUND =
+  "GROUND LAYER: every empty area is a plain linen ground in the lightest color of the collection palette, carrying a fine, even, regularly woven texture printed into the artwork itself, subtle and low contrast, visible across the whole background. This weave is a flat printed texture seen straight from above: never a photograph of cloth, never folds, never drape, never 3D. The motifs are painted opaquely on top of it, so the weave stops at the edge of each fruit, flower and leaf and never shows through them.";
+
+const PAINTED_CONSTRAINTS =
+  "CONSTRAINTS: no text, no letters, no labels, no numbers, no watermark, no signature; no mockup, no product photo, no sewn item, no table, no plate, no cutlery, no props, no hands; no perspective, no folds, no draped cloth, no 3D; no shadow cast onto the ground, no glow, no halo, no spotlight, no vignette; no blur and no out-of-focus area anywhere in the image; the artwork is flat, seen straight from above, filling the whole image with no white margin; no drawn outline border around the artwork unless explicitly requested above.";
+
+/** Estilos que pedem modelagem botanica. Ludico e minimalista sao chapados de proposito. */
+const LINEN_GROUND_BLENDER =
+  "GROUND: paint the design on a plain linen ground in the lightest color of the collection palette, carrying a fine, even, regularly woven texture printed into the artwork itself, subtle and low contrast. The colored marks are printed onto that linen, so the weave stays faintly visible through them instead of covering it. This weave is a flat printed texture seen straight from above: never a photograph of cloth, never folds, never 3D.";
+
+const MODELLED_STYLES = new Set(["aquarela-delicada", "botanico-vintage"]);
+
+/** Sem estilo definido a colecao cai no padrao aquarela, que e modelado. */
+export function isModelledStyle(style?: string): boolean {
+  const key = (style ?? "").trim();
+  return key === "" || MODELLED_STYLES.has(key);
+}
+
+/** Blocos de acabamento aplicados so onde fazem sentido. */
+function finishFor(style: string | undefined, ground: boolean): string[] {
+  if (!isModelledStyle(style)) return [];
+  return ground ? [MOTIF_RENDERING, LINEN_GROUND] : [MOTIF_RENDERING];
+}
+
 /** Linha de controles de estilo usada em todos os prompts. */
 function styleControls(o: Overrides, frame: boolean, blender = false): string {
   const scale = SCALE[levelIndex(o.motifScale)]!.replace(
@@ -139,7 +171,7 @@ export function formatSection(app: AppSpec): string {
       return [
         `PRODUCT FORMAT: a square module for a table-runner border print.`,
         `A decorative band of motifs runs along the TOP edge and an equally decorated, equally full band runs along the BOTTOM edge, each about ${bandFrac} of the height; the bottom band must be just as finished, detailed and richly painted as the top band, never left empty, faded or unfinished.`,
-        `Between the two bands is a calm center made of a clean, dry watercolor-paper ground in the lightest base color, almost empty, with at most a few very small sparse specks.`,
+        `Between the two bands is a calm center made of a clean linen ground in the lightest base color, almost empty, with at most a few very small sparse specks.`,
         `The center must stay crisp and light: no blurry wash, no out-of-focus flowers, no faded or smeared motifs, and no soft gradient bleeding down from the top band into the center.`,
         `Left and right edges must continue into each other so the module repeats horizontally, with no motif cut at the sides.`,
       ].join(" ");
@@ -148,7 +180,8 @@ export function formatSection(app: AppSpec): string {
     return [
       `PRODUCT FORMAT: a square module for a border print: a decorative border along the bottom edge occupying about ${ratio.toFixed(2)} of the height, built in two layers.`,
       `The lower layer is the main band of motifs in a single row; directly above it sits a narrow finishing trim strip about ${trimCm} cm tall running the full width.`,
-      `Everything above that is a calm, almost plain quiet area.`,
+      `Everything above that is a calm, almost plain quiet area, with one or two motif clusters descending into it from the upper corners.`,
+      `BRIDGE, this is what makes the border look designed instead of pasted on: at least one motif cluster must straddle the top edge of the band, sitting partly on the plain ground above and partly over the band below, so the two zones interlock. The band edge stays straight and full width underneath; the motif simply overlaps it.`,
       `Left and right edges must continue into each other so the module repeats horizontally, with no motif cut at the sides.`,
     ].join(" ");
   }
@@ -162,7 +195,7 @@ export function formatSection(app: AppSpec): string {
   const bg = frame?.backgroundStyle ?? "plain";
 
   if (frame?.accent === "corner") {
-    return `PRODUCT FORMAT: a single flat square napkin design, aspect ${w}:${h}, on a plain calm watercolor-paper ground in the base color. Draw exactly ONE graceful corner bouquet or motif cluster anchored in the lower-right corner, growing inward from that corner, occupying about 25 to 30% of the width and height. The other three corners, the whole center and all four edges stay completely empty plain ground. CRITICAL: draw only ONE single design, never several squares, panels, napkins, frames, a grid or a repeated layout; no border line around the edges. Do not draw a real napkin object, a table, a plate, a mockup or a product photo; the art is flat, seen straight from above, filling the whole image with no white margin.`;
+    return `PRODUCT FORMAT: a single flat square napkin design, aspect ${w}:${h}, on a plain calm linen ground in the base color. Draw exactly ONE graceful corner bouquet or motif cluster anchored in the lower-right corner, growing inward from that corner, occupying about 25 to 30% of the width and height. The other three corners, the whole center and all four edges stay completely empty plain ground. CRITICAL: draw only ONE single design, never several squares, panels, napkins, frames, a grid or a repeated layout; no border line around the edges. Do not draw a real napkin object, a table, a plate, a mockup or a product photo; the art is flat, seen straight from above, filling the whole image with no white margin.`;
   }
 
   const quietCm = frame?.quietArea
@@ -173,7 +206,8 @@ export function formatSection(app: AppSpec): string {
     // Jogo americano no padrão da loja: moldura recuada, cantos carregados, centro calmo.
     return [
       `PRODUCT FORMAT: a single finished landscape placemat panel artwork, ${w} cm wide by ${h} cm tall, aspect ${w}:${h}, drawn horizontally.`,
-      `COMPOSITION: a decorative frame line or scrollwork border set about 2 cm inside the outer edge, running all the way around; generous bouquets, fruit or foliage clusters anchored in two opposite corners, or smaller clusters in all four corners, spilling slightly over the border line; the whole center is calm, only a very subtle tone-on-tone linen-like texture in the base color; a central resting zone of about ${quietCm} that stays free of motifs, washes and marks, painted in exactly the same background color and paper texture as the rest of the panel; a short handwritten-style word or a small stamp motif only if the theme clearly calls for it, never in the central zone.`,
+      `FRAME: an ornamental border band set about 2 cm inside the outer edge and running all the way around, bounded on both its outer and its inner side by a pair of thin parallel rules; inside that band, symmetric scrollwork drawn in a single accent color of the palette, shaded from a pale wash to a deep saturated tone with clean reserved highlights, with a small medallion centred in each of the four corners and a centred symmetrical motif at the middle of each of the four sides.`,
+      `COMPOSITION: generous bouquets, fruit or foliage clusters sitting in the outer margin between the frame and the image edge, concentrated at two opposite corners or more lightly at all four, running off the image edge where they reach it instead of being tucked neatly inside, and overlapping inward over the outer rule and partly onto the scrollwork; the whole center is calm, only the plain linen ground in the base color; a central resting zone of about ${quietCm} that stays free of motifs, washes and marks, painted in exactly the same background color and linen texture as the rest of the panel; a short handwritten-style word or a small stamp motif only if the theme clearly calls for it, never in the central zone.`,
       "CRITICAL: the center is only empty background, never a drawn object. Do NOT draw a plate, a dish, a white circle, a white disc, a bright or solid filled shape, a halo or a spotlight in the middle; the central zone must be the very same ground as the rest, just without decoration.",
       "Do not draw any plate, cutlery, napkin, table, mockup or product photo. The artwork is flat, seen straight from above, filling the whole image with no white margin around it.",
     ].join(" ");
@@ -182,7 +216,7 @@ export function formatSection(app: AppSpec): string {
   const quiet = frame?.quietArea
     ? `a quiet ${frame.quietArea.shape === "circle" ? "circular" : "rectangular"} area in the center, roughly ${frame.quietArea.widthCm} x ${frame.quietArea.heightCm} cm of the ${w} x ${h} cm panel, completely free of motifs`
     : "a calm center with lighter, sparser decoration";
-  return `PRODUCT FORMAT: a single finished ${shape === "circle" ? "round" : "framed rectangular"} panel artwork, aspect ${w}:${h}, ${bg === "coordinate" ? "background filled with a soft coordinating pattern" : "plain calm background"}, with ${quiet}; motifs concentrated at the sides and corners as a decorative frame; do not draw any plate, cutlery, table, mockup or product photo.`;
+  return `PRODUCT FORMAT: a single finished ${shape === "circle" ? "round" : "framed rectangular"} panel artwork, aspect ${w}:${h}, ${bg === "coordinate" ? "background filled with a soft coordinating pattern" : "plain calm background"}, with ${quiet}; motifs concentrated at the sides and corners as a decorative frame, with the corner clusters crossing slightly over the frame rule instead of stopping short of it, so the border reads as designed and not as clip art; do not draw any plate, cutlery, table, mockup or product photo.`;
 }
 
 export type LegacySize = "1024x1024" | "1024x1536" | "1536x1024";
@@ -267,6 +301,8 @@ export function buildImagePrompt(input: {
   overrides: Overrides;
   palette: string[];
   reinforce?: boolean;
+  /** Estilo da colecao: decide se entra a modelagem botanica. */
+  style?: string;
 }): string {
   const o = input.overrides ?? {};
   const parts = [
@@ -274,17 +310,19 @@ export function buildImagePrompt(input: {
     input.reinforce ? reinforcementFor(input.app) : "",
     [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),
     styleControls(o, input.app.family === "painel"),
+    ...finishFor(input.style, true),
     `AUTHORITATIVE COLOR PALETTE, use only these colors and their tints: ${input.palette.join(", ")}.`,
-    "CONSTRAINTS: no text, no letters, no labels, no watermark, no signature, no mockup or product photo, no visible fabric weave or texture of cloth, no drop shadows, no perspective, flat illustration only, no drawn outline borders around the artwork unless explicitly requested above.",
+    PAINTED_CONSTRAINTS,
   ];
   return parts.filter(Boolean).join("\n\n");
 }
 
 /** Descrição real de cada estilo do catálogo, para o modelo de imagem. */
 const STYLE_DESCRIPTIONS: Record<string, string> = {
-  "aquarela-delicada": "soft delicate watercolor, light washes, dissolved outlines, visible paper grain",
+  "aquarela-delicada":
+    "hand-painted botanical watercolor in a soft delicate register: luminous transparent washes layered wet on dry, confident defined edges, fine brush detail inside every petal and leaf, visible watercolor paper grain",
   "botanico-vintage":
-    "vintage botanical plate illustration, fine ink linework with muted washes, engraved feel",
+    "classic vintage botanical plate illustration: fine ink linework over muted layered washes, engraved feel, high botanical accuracy with every fruit and petal fully modelled",
   "ilustracao-ludica":
     "playful childlike gouache illustration, rounded simple shapes, cheerful flat colors",
   "traco-minimalista":
@@ -310,6 +348,8 @@ export function buildMotifSheetPrompt(input: {
   palette: string[];
   plainBackgroundHex?: string;
   strict?: boolean;
+  /** Estilo da colecao: decide se entra a modelagem botanica. */
+  style?: string;
 }): string {
   const background = input.plainBackgroundHex
     ? `Place every element over a single flat uniform ${input.plainBackgroundHex} background, exactly the same tone everywhere, with no gradient and no texture.`
@@ -322,6 +362,7 @@ export function buildMotifSheetPrompt(input: {
       ? `STRICT: the sheet must contain only these elements and nothing else: ${[...motifs, ...fillers].join("; ")}. Any element outside this list is a rejection.`
       : "",
     input.sharedDirection ? `DIRECTION: ${input.sharedDirection}` : "",
+    ...finishFor(input.style, false),
     background,
     "CONSTRAINTS: elements arranged in a loose grid with generous empty space between them, nothing touching the image edges, no text, no labels, no numbers, no watermark, no drop shadows, no mockup, flat illustration only.",
   ]
@@ -449,8 +490,12 @@ export function buildSolidDotPrompt(input: {
 }
 
 /** Prompt de cada coordenado pintado, com proporções em porcentagem do rapport. */
-function blenderPrompt(app: AppSpec, layout: string): string {
+function blenderPrompt(app: AppSpec, layout: string, style?: string): string {
   const p = app.params ?? {};
+  // Aquarela pede borda mole; azulejo, jeans e afins pedem borda reta.
+  const stripeEdge = isModelledStyle(style)
+    ? "each stripe hand-painted with a slightly irregular living edge and visible brush drag, the density varying subtly from stripe to stripe"
+    : "each stripe with a clean straight crisp edge and flat even color, never a wobbly or feathered edge";
   const rapport = Number(p["rapportCm"] ?? 10);
   if (layout === "dots") {
     const dot = pct(Number(p["dotMm"] ?? 2), rapport);
@@ -460,7 +505,7 @@ function blenderPrompt(app: AppSpec, layout: string): string {
   if (layout === "stripe") {
     const w = pct(Number(p["stripeMm"] ?? 2.5), rapport);
     const gap = snapPeriod(Number(p["spacingMm"] ?? 10), rapport);
-    return `seamless repeat tile of a classic textile fine stripe print: perfectly straight vertical hand-painted stripes of the chosen stripe color on a solid ground of the chosen background color, stripe width about ${w} of the tile width, spacing between stripe centers about ${pct(gap.mm, rapport)} of the tile width, exactly ${gap.count} stripes across the tile, stripes running from top to bottom so the pattern continues exactly across all four edges, soft watercolor edge on each stripe, no floral motifs, flat print artwork`;
+    return `seamless repeat tile of a classic textile fine stripe print: perfectly straight vertical hand-painted stripes of the chosen stripe color on a solid ground of the chosen background color, stripe width about ${w} of the tile width, spacing between stripe centers about ${pct(gap.mm, rapport)} of the tile width, exactly ${gap.count} stripes across the tile, stripes running from top to bottom so the pattern continues exactly across all four edges; ${stripeEdge}; the stripe color is printed onto the linen, so the weave stays faintly visible through it; no floral motifs, flat print artwork`;
   }
   if (layout === "plaid") {
     const snapped = snapPeriod(Number(p["squareMm"] ?? 30) * 2, rapport);
@@ -493,6 +538,8 @@ export function buildFromSheetPrompt(input: {
   reinforce?: boolean;
   /** Nomes em inglês dos motivos que continuam valendo nesta coleção. */
   allowedMotifs?: string[];
+  /** Estilo da colecao: decide se entra a modelagem botanica. */
+  style?: string;
 }): string {
   const o = input.overrides ?? {};
   const repeat = input.app.family !== "painel";
@@ -507,13 +554,14 @@ export function buildFromSheetPrompt(input: {
   }
   if (blender) {
     return [
-      blenderPrompt(input.app, blender),
+      blenderPrompt(input.app, blender, input.style),
       "The provided image is only a color and brushwork reference: do not copy its motifs, do not reproduce its layout, no flowers or leaves anywhere.",
       [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),
       "COLOR PAIR: follow exactly the background color and the mark color stated above; the marks must contrast clearly with the ground, never off-white marks on a light ground.",
       `CONTRAST LEVEL: ${BLENDER_CONTRAST[levelIndex(o.contrast)]!}.`,
       `AUTHORITATIVE COLOR PALETTE, use only these colors and their tints: ${input.palette.join(", ")}.`,
-      "CONSTRAINTS: no text, no letters, no watermark, no mockup or product photo, no visible cloth weave, no drop shadows, no gradients other than the requested watercolor wash, flat illustration only.",
+      LINEN_GROUND_BLENDER,
+      `${PAINTED_CONSTRAINTS} No gradients other than the requested watercolor wash.`,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -530,8 +578,9 @@ export function buildFromSheetPrompt(input: {
     input.reinforce ? reinforcementFor(input.app) : "",
     [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),
     styleControls(o, input.app.family === "painel"),
+    ...finishFor(input.style, true),
     `AUTHORITATIVE COLOR PALETTE, use only these colors and their tints: ${input.palette.join(", ")}.`,
-    "CONSTRAINTS: no text, no letters, no watermark, no mockup or product photo, no visible cloth weave, no drop shadows, flat illustration only.",
+    PAINTED_CONSTRAINTS,
   ]
     .filter(Boolean)
     .join("\n\n");
