@@ -116,12 +116,23 @@ function frameOf(params: Record<string, unknown>) {
   return frames;
 }
 
-export function formatSection(app: AppSpec): string {
+export function formatSection(app: AppSpec, secondary?: string): string {
   const p = app.params ?? {};
+  // Linguagem grafica secundaria da colecao (azulejo, listra, jeans, renda...).
+  // E ela que amarra as pecas: vira moldura no painel, filigrana no barrado
+  // e ornamento solto na estampa corrida.
+  const sec = (secondary ?? "").trim();
   if (app.family === "corrida") {
     const rapport = Number(p["rapportCm"] ?? 30);
     const layout = String(p["layout"] ?? "tossed");
-    return `PRODUCT FORMAT: a seamless square repeat tile representing ${rapport} x ${rapport} cm of printed fabric, ${layout} layout, motifs scattered across the whole square, no border, no frame; opposite edges must continue into each other so the tile repeats invisibly in every direction.`;
+    return [
+      `PRODUCT FORMAT: a seamless square repeat tile representing ${rapport} x ${rapport} cm of printed fabric, ${layout} layout, motifs scattered across the whole square, no border, no frame; opposite edges must continue into each other so the tile repeats invisibly in every direction.`,
+      sec
+        ? `SECOND LAYER: scatter ${sec} ornaments in between the main motifs, clearly smaller and quieter than the main subject and drawn in a single accent color, so this print reads as a member of the same collection instead of a standalone floral.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
   if (app.family === "barrado") {
     const bands = Number(p["bands"] ?? 1);
@@ -180,6 +191,9 @@ export function formatSection(app: AppSpec): string {
     return [
       `PRODUCT FORMAT: a square module for a border print: a decorative border along the bottom edge occupying about ${ratio.toFixed(2)} of the height, built in two layers.`,
       `The lower layer is the main band of motifs in a single row; directly above it sits a narrow finishing trim strip about ${trimCm} cm tall running the full width.`,
+      sec
+        ? `The band is built out of ${sec}: use it for the band ground and for the finishing trim strip, mixing stripe widths and letting a fine reserved pattern show inside the wider stripes, so the border belongs to the same family as the framed pieces.`
+        : "",
       `Everything above that is a calm, almost plain quiet area, with one or two motif clusters descending into it from the upper corners.`,
       `BRIDGE, this is what makes the border look designed instead of pasted on: at least one motif cluster must straddle the top edge of the band, sitting partly on the plain ground above and partly over the band below, so the two zones interlock. The band edge stays straight and full width underneath; the motif simply overlaps it.`,
       `Left and right edges must continue into each other so the module repeats horizontally, with no motif cut at the sides.`,
@@ -206,7 +220,7 @@ export function formatSection(app: AppSpec): string {
     // Jogo americano no padrão da loja: moldura recuada, cantos carregados, centro calmo.
     return [
       `PRODUCT FORMAT: a single finished landscape placemat panel artwork, ${w} cm wide by ${h} cm tall, aspect ${w}:${h}, drawn horizontally.`,
-      `FRAME: an ornamental border band set about 2 cm inside the outer edge and running all the way around, bounded on both its outer and its inner side by a pair of thin parallel rules; inside that band, symmetric scrollwork drawn in a single accent color of the palette, shaded from a pale wash to a deep saturated tone with clean reserved highlights, with a small medallion centred in each of the four corners and a centred symmetrical motif at the middle of each of the four sides.`,
+      `FRAME: an ornamental border band set about 2 cm inside the outer edge and running all the way around, bounded on both its outer and its inner side by a pair of thin parallel rules; inside that band, symmetric ${sec || "scrollwork"} drawn in a single accent color of the palette, shaded from a pale wash to a deep saturated tone with clean reserved highlights, with a small medallion centred in each of the four corners and a centred symmetrical motif at the middle of each of the four sides.`,
       `COMPOSITION: generous bouquets, fruit or foliage clusters sitting in the outer margin between the frame and the image edge, concentrated at two opposite corners or more lightly at all four, running off the image edge where they reach it instead of being tucked neatly inside, and overlapping inward over the outer rule and partly onto the scrollwork; the whole center is calm, only the plain linen ground in the base color; a central resting zone of about ${quietCm} that stays free of motifs, washes and marks, painted in exactly the same background color and linen texture as the rest of the panel; a short handwritten-style word or a small stamp motif only if the theme clearly calls for it, never in the central zone.`,
       "CRITICAL: the center is only empty background, never a drawn object. Do NOT draw a plate, a dish, a white circle, a white disc, a bright or solid filled shape, a halo or a spotlight in the middle; the central zone must be the very same ground as the rest, just without decoration.",
       "Do not draw any plate, cutlery, napkin, table, mockup or product photo. The artwork is flat, seen straight from above, filling the whole image with no white margin around it.",
@@ -303,10 +317,12 @@ export function buildImagePrompt(input: {
   reinforce?: boolean;
   /** Estilo da colecao: decide se entra a modelagem botanica. */
   style?: string;
+  /** Linguagem grafica secundaria da colecao, em ingles, para os prompts. */
+  secondary?: string;
 }): string {
   const o = input.overrides ?? {};
   const parts = [
-    formatSection(input.app),
+    formatSection(input.app, input.secondary),
     input.reinforce ? reinforcementFor(input.app) : "",
     [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),
     styleControls(o, input.app.family === "painel"),
@@ -540,6 +556,8 @@ export function buildFromSheetPrompt(input: {
   allowedMotifs?: string[];
   /** Estilo da colecao: decide se entra a modelagem botanica. */
   style?: string;
+  /** Linguagem grafica secundaria da colecao, em ingles, para os prompts. */
+  secondary?: string;
 }): string {
   const o = input.overrides ?? {};
   const repeat = input.app.family !== "painel";
@@ -568,7 +586,7 @@ export function buildFromSheetPrompt(input: {
   }
   const allowed = (input.allowedMotifs ?? []).filter(Boolean);
   return [
-    formatSection(input.app),
+    formatSection(input.app, input.secondary),
     "USE ONLY THE MOTIFS FROM THE PROVIDED SHEET, same brushwork and palette; arrange them in a natural hand-painted textile layout with varied rotation, gentle overlaps between the listed elements and balanced density; opposite edges must continue into each other.",
     allowed.length > 0 ? `ALLOWED ELEMENTS, nothing else: ${allowed.join("; ")}.` : "",
     repeat

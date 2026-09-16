@@ -5,6 +5,10 @@ import { toast } from "sonner";
 import { BriefForm } from "@/components/studio/BriefForm";
 import { CollectionHeader } from "@/components/studio/CollectionHeader";
 import { DirectionPanel } from "@/components/studio/DirectionPanel";
+import {
+  DirectionChooser,
+  type ChosenDirection,
+} from "@/components/studio/DirectionChooser";
 import { DirectionDetails } from "@/components/studio/DirectionDetails";
 import { PatternGrid } from "@/components/studio/PatternGrid";
 import { PreviewDialog } from "@/components/studio/PreviewDialog";
@@ -13,11 +17,15 @@ import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { useStudio } from "@/hooks/use-studio";
 import {
+  chooseDirection,
   creativeDirector,
+  exploreDirections,
   saveMotifs,
   setMotifExcluded,
   understandIdea,
   upscalePiece,
+  type ExploreDirection,
+  type ExploreQuestion,
 } from "@/lib/api/ai.functions";
 import {
   cancelJob,
@@ -131,6 +139,11 @@ function StudioPage() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<JobView | null>(null);
+  // Etapa 1.5: perguntas geradas e três direções para escolher.
+  const [exploreQuestions, setExploreQuestions] = useState<ExploreQuestion[]>([]);
+  const [exploreDirs, setExploreDirs] = useState<ExploreDirection[]>([]);
+  const [exploring, setExploring] = useState(false);
+  const [chosenDir, setChosenDir] = useState<ChosenDirection | null>(null);
   const [elapsed, setElapsed] = useState(0);
   /** O job terminou e o resultado ainda está sendo lido. */
   const [loadingResult, setLoadingResult] = useState(false);
@@ -149,6 +162,8 @@ function StudioPage() {
   const save = useServerFn(saveCollection);
   const director = useServerFn(creativeDirector);
   const understand = useServerFn(understandIdea);
+  const explore = useServerFn(exploreDirections);
+  const pickDirection = useServerFn(chooseDirection);
   const persistDirection = useServerFn(updateDirection);
   const persistPalette = useServerFn(updateCollectionPalette);
   const fetchCollection = useServerFn(getCollection);
@@ -286,6 +301,8 @@ function StudioPage() {
             motifs?: { name: string; en: string }[];
             avoid?: string[];
             sheetReview?: SheetReviewJson;
+            chosenDirection?: { name: string; pitch: string; mood: string };
+            secondaryLanguage?: { name: string; en: string; note: string };
             styleLevels?: {
               size?: number;
               density?: number;
@@ -322,6 +339,20 @@ function StudioPage() {
             : status === "montagem" || status === "gerando"
               ? "montagem"
               : "proposta";
+
+      // Reabriu a coleção: traz de volta a direção já escolhida, se houver.
+      setChosenDir(
+        directionJson?.chosenDirection && directionJson?.secondaryLanguage
+          ? {
+              name: directionJson.chosenDirection.name,
+              pitch: directionJson.chosenDirection.pitch ?? "",
+              mood: directionJson.chosenDirection.mood ?? "",
+              secondaryLanguage: directionJson.secondaryLanguage,
+            }
+          : null,
+      );
+      setExploreQuestions([]);
+      setExploreDirs([]);
 
       dispatch({
         type: "loadState",
@@ -635,6 +666,55 @@ function StudioPage() {
       toast.success("Veja o que entendi da sua ideia.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível elaborar a proposta.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Etapa 1.5: até duas perguntas sobre o que ficou em aberto e três direções. */
+  async function handleExplore(answers?: { question: string; answer: string }[]) {
+    if (!state.collectionId) {
+      toast.error("Elabore a ideia antes de explorar direções.");
+      return;
+    }
+    setExploring(true);
+    setChosenDir(null);
+    try {
+      const out = await explore({
+        data: { collectionId: state.collectionId, ...(answers ? { answers } : {}) },
+      });
+      setExploreQuestions(out.questions ?? []);
+      setExploreDirs(out.directions ?? []);
+      if ((out.directions ?? []).length === 0) {
+        toast.error("Não consegui propor direções agora. Tente de novo.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível explorar direções.");
+    } finally {
+      setExploring(false);
+    }
+  }
+
+  /** Guarda a direção escolhida para a etapa 2 seguir. */
+  async function handleChooseDirection(chosen: ExploreDirection) {
+    if (!state.collectionId) return;
+    setBusy(true);
+    try {
+      await pickDirection({
+        data: {
+          collectionId: state.collectionId,
+          name: chosen.name,
+          pitch: chosen.pitch,
+          mood: chosen.mood,
+          secondaryLanguage: chosen.secondaryLanguage,
+        },
+      });
+      setChosenDir(chosen);
+      setExploreQuestions([]);
+      setExploreDirs([]);
+      toast.success(`Direção escolhida: ${chosen.name}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não consegui guardar a direção.");
     } finally {
       setBusy(false);
     }
@@ -981,6 +1061,19 @@ function StudioPage() {
         <div className="space-y-8">
           {state.direction && (
             <DirectionPanel direction={state.direction} shared={state.shared} />
+          )}
+
+          {state.direction && (
+            <DirectionChooser
+              questions={exploreQuestions}
+              directions={exploreDirs}
+              chosen={chosenDir}
+              loading={exploring}
+              busy={busy || generating}
+              onExplore={() => void handleExplore()}
+              onAnswer={(a) => void handleExplore(a)}
+              onChoose={(d) => void handleChooseDirection(d)}
+            />
           )}
 
           {(state.direction || state.sheetUrl) && (

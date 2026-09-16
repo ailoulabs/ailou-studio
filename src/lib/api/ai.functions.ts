@@ -58,6 +58,7 @@ const DIRECTION_SCHEMA = {
     "fillers",
     "category",
     "styleLevels",
+    "secondaryLanguage",
   ],
   properties: {
     summaryBullets: { type: "array", items: { type: "string" } },
@@ -77,6 +78,19 @@ const DIRECTION_SCHEMA = {
     },
     suggestedColors: { type: "array", items: { type: "string" } },
     paletteReason: { type: "string" },
+    secondaryLanguage: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "en", "note"],
+      properties: {
+        /** Nome em português, para a tela. */
+        name: { type: "string" },
+        /** Descrição curta em inglês, para o prompt de imagem. */
+        en: { type: "string" },
+        /** Uma frase em português dizendo onde ela aparece na coleção. */
+        note: { type: "string" },
+      },
+    },
     styleLevels: {
       type: "object",
       additionalProperties: false,
@@ -113,6 +127,26 @@ COORDENADOS DE APOIO (poá, listrado, xadrez, textura): escolha o par de cores d
 em inglês entre parênteses no final, qual é o fundo e qual é a marca, assim: (background color: #XXXXXX, dot color: #XXXXXX)
 ou (background color: #XXXXXX, stripe color: #XXXXXX). O contraste tem que ser forte: nunca bolinha branca ou off-white em fundo claro.
 No poá clássico o fundo é uma cor cheia da paleta e a bolinha é branca ou creme.
+LINGUAGEM SECUNDÁRIA, obrigatória: toda coleção comercial tem duas linguagens, o assunto principal
+e uma linguagem gráfica secundária que costura o conjunto inteiro. Em coleções reais isso aparece assim:
+buganvília com azulejo português azul, pêssego com listra pintada e moldura ornamentada, xícara de café com jeans e patchwork.
+Se vier linguagemSecundariaEscolhida, ela já foi escolhida pela artesã: copie name, en e note exatamente como vieram
+em secondaryLanguage, sem trocar por outra e sem reescrever, e construa a coleção inteira em cima dela.
+Se vier direcaoEscolhida, respeite o clima e a promessa daquela direção em todas as orientações peça a peça.
+Só quando os dois vierem vazios é que você escolhe a linguagem secundária.
+Escolha uma linguagem secundária que converse com o tema e preencha secondaryLanguage:
+name em português para a tela, en em inglês curto para o prompt de imagem, e note em uma frase dizendo onde ela aparece.
+Ela não é enfeite de canto: precisa reaparecer em pelo menos três papéis diferentes ao longo da coleção,
+por exemplo como moldura da peça de painel, como faixa ou filigrana no barrado, e solta entre os motivos na estampa corrida.
+Escolha algo com estrutura gráfica própria, como azulejo, arabesco, listra, vichy, jeans, renda, ladrilho hidráulico, palha ou cerâmica,
+nunca outra flor ou outra fruta, porque isso só repetiria o assunto principal.
+Cite a linguagem secundária nas orientações peça a peça, dizendo que papel ela cumpre naquela peça.
+IMPORTANTE, para a linguagem secundária poder ser desenhada: quando category estiver vazio, inclua também
+um ou dois elementos dela na lista de motifs, como motivo de verdade (por exemplo "arabesco de azulejo",
+"medalhão de azulejo"), porque a prancha de motivos e a lista de elementos permitidos saem justamente de motifs.
+Sem isso a peça recebe ordem de desenhar o ornamento e proibição de desenhar, ao mesmo tempo.
+Quando category estiver preenchido, não inclua: nesse caso a linguagem secundária aparece só como
+moldura, faixa ou fundo, nunca como motivo solto.
 Escreva de 4 a 6 tópicos curtos em summaryBullets.
 PALETA: você é quem propõe a paleta. Nunca repita uma paleta recebida como se fosse definitiva.
 Proponha exatamente 5 cores em hexadecimal derivadas da ideia, do estilo e da imagem de referência:
@@ -310,6 +344,10 @@ export const creativeDirector = createServerFn({ method: "POST" })
             uso: brief["usage"] ?? "",
             coresObrigatorias: asColors(brief["requiredColors"]),
             coresPreferidas: asColors(brief["preferredColors"]),
+            direcaoEscolhida:
+              ((collection.direction ?? {}) as Record<string, unknown>)["chosenDirection"] ?? null,
+            linguagemSecundariaEscolhida:
+              ((collection.direction ?? {}) as Record<string, unknown>)["secondaryLanguage"] ?? null,
             motivosEntendidos:
               ((collection.direction ?? {}) as unknown as DirectionResult).motifs ?? [],
             foraDoTema:
@@ -690,4 +728,233 @@ export const setMotifExcluded = createServerFn({ method: "POST" })
       sheetUrl = signed.data?.signedUrl ?? null;
     }
     return { motifs: updated, sheetUrl };
+  });
+
+/* ------------------------------------------------------------------ *
+ * Exploração criativa: perguntas geradas e três direções para escolher.
+ * Roda entre a etapa 1 (entendimento) e a etapa 2 (paleta e motivos).
+ * ------------------------------------------------------------------ */
+
+const SECONDARY_LANGUAGE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "en", "note"],
+  properties: {
+    name: { type: "string" },
+    en: { type: "string" },
+    note: { type: "string" },
+  },
+} as const;
+
+const EXPLORE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["questions", "directions"],
+  properties: {
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "question", "options"],
+        properties: {
+          id: { type: "string" },
+          question: { type: "string" },
+          options: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["label", "hint"],
+              properties: { label: { type: "string" }, hint: { type: "string" } },
+            },
+          },
+        },
+      },
+    },
+    directions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "pitch", "mood", "secondaryLanguage"],
+        properties: {
+          name: { type: "string" },
+          pitch: { type: "string" },
+          mood: { type: "string" },
+          secondaryLanguage: SECONDARY_LANGUAGE_SCHEMA,
+        },
+      },
+    },
+  },
+} as const;
+
+const EXPLORE_SYSTEM = `Você é diretor criativo de estamparia têxtil brasileira. Sua tarefa aqui é abrir possibilidades, não fechar.
+
+Toda coleção comercial tem duas linguagens: o assunto principal, que a artesã já disse, e uma linguagem gráfica
+secundária que costura o conjunto inteiro. Buganvília com azulejo português. Pêssego com listra pintada e moldura
+ornamentada. Xícara de café com jeans e patchwork. É quase sempre a segunda linguagem que falta quando a pessoa
+descreve só o tema, e é ela que faz cinco peças parecerem uma família em vez de cinco desenhos do mesmo assunto.
+
+PERGUNTAS: no máximo 2, e só sobre o que estiver de fato indefinido nesta ideia.
+Se a pessoa já disse o suficiente, devolva a lista vazia, sem inventar pergunta para preencher espaço.
+Nunca pergunte o que você mesmo consegue decidir, nunca pergunte sobre cor porque a paleta vem na etapa seguinte,
+e nunca repita uma pergunta que já foi respondida.
+Cada pergunta tem de 3 a 4 opções concretas: label curto em português e hint de uma linha dizendo o efeito visual
+daquela escolha. Nada de opção "outro", "tanto faz" ou "a critério da IA".
+
+DIREÇÕES: exatamente 3, bem diferentes entre si, cada uma já completa e defensável sozinha.
+Em name use o formato "assunto com linguagem", por exemplo "Pêssego com azulejo".
+Em pitch escreva uma frase dizendo como a coleção vai parecer na mesa posta.
+Em mood use duas ou três palavras de clima.
+Em secondaryLanguage preencha name em português para a tela, en em inglês curto para o prompt de imagem,
+e note dizendo em que peças ela aparece.
+As 3 linguagens secundárias têm de ser de famílias diferentes, nunca três variações de listra.
+Escolha coisas com estrutura gráfica própria, como azulejo, arabesco, listra, vichy, jeans, renda, ladrilho
+hidráulico, palha, cerâmica, xadrez ou poá. Nunca outra flor e nunca outra fruta, porque isso só repete o assunto.
+Respeite as exclusões: se a pessoa disse que não quer X, X não aparece em nenhuma das 3 direções.
+Se vierem respostas da artesã, as 3 direções têm de obedecer a todas elas.
+
+Escreva tudo em português do Brasil, sem usar o caractere travessão.`;
+
+export interface ExploreOption {
+  label: string;
+  hint: string;
+}
+export interface ExploreQuestion {
+  id: string;
+  question: string;
+  options: ExploreOption[];
+}
+export interface SecondaryLanguage {
+  name: string;
+  en: string;
+  note: string;
+}
+export interface ExploreDirection {
+  name: string;
+  pitch: string;
+  mood: string;
+  secondaryLanguage: SecondaryLanguage;
+}
+export interface ExploreResult {
+  questions: ExploreQuestion[];
+  directions: ExploreDirection[];
+}
+
+/**
+ * Etapa 1.5: devolve até 2 perguntas sobre o que ficou indefinido e 3 direções
+ * completas para escolher. Chamar de novo com as respostas refina as direções,
+ * e aí questions volta vazio. Responder é opcional: dá para escolher direto.
+ */
+export const exploreDirections = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      collectionId: uuid,
+      answers: z
+        .array(z.object({ question: z.string(), answer: z.string() }))
+        .max(4)
+        .optional(),
+    }).parse,
+  )
+  .handler(async ({ data, context }): Promise<ExploreResult> => {
+    const { supabase, userId } = context;
+    const { openAiKey, openAiError } = await import("@/lib/ai/openai.server");
+
+    const { data: collection, error } = await supabase
+      .from("collections")
+      .select("*")
+      .eq("id", data.collectionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!collection) throw new Error("Coleção não encontrada.");
+
+    const brief = (collection.brief ?? {}) as Record<string, unknown>;
+    const previous = (collection.direction ?? {}) as Record<string, unknown>;
+    const answers = data.answers ?? [];
+
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${openAiKey()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL_DIRECTOR,
+        reasoning_effort: "low",
+        messages: [
+          { role: "system", content: EXPLORE_SYSTEM },
+          {
+            role: "user",
+            content: JSON.stringify({
+              nomeDaColecao: collection.name,
+              ideia: brief["idea"] ?? "",
+              estilo: brief["style"] ?? "",
+              uso: brief["usage"] ?? "",
+              motivosEntendidos: previous["motifs"] ?? [],
+              foraDoTema: previous["avoid"] ?? [],
+              categoria: previous["category"] ?? "",
+              respostasDaArtesa: answers,
+            }),
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: "exploracao", strict: true, schema: EXPLORE_SCHEMA },
+        },
+      }),
+    });
+    if (!res.ok) throw new Error(openAiError(res.status));
+    const json = (await res.json()) as { choices: { message: { content: string } }[] };
+    const parsed = JSON.parse(json.choices[0]!.message.content) as ExploreResult;
+
+    // Já respondeu tudo: não faz sentido perguntar de novo.
+    const questions = answers.length > 0 ? [] : (parsed.questions ?? []).slice(0, 2);
+    const directions = (parsed.directions ?? [])
+      .filter((d) => d?.name && d?.secondaryLanguage?.en)
+      .slice(0, 3);
+
+    return { questions, directions };
+  });
+
+/** Guarda a direção escolhida para a etapa 2 obedecer. */
+export const chooseDirection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      collectionId: uuid,
+      name: z.string().min(1),
+      pitch: z.string().default(""),
+      mood: z.string().default(""),
+      secondaryLanguage: z.object({
+        name: z.string().min(1),
+        en: z.string().min(1),
+        note: z.string().default(""),
+      }),
+    }).parse,
+  )
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { supabase, userId } = context;
+    const { data: collection, error } = await supabase
+      .from("collections")
+      .select("direction")
+      .eq("id", data.collectionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!collection) throw new Error("Coleção não encontrada.");
+
+    const previous = (collection.direction ?? {}) as Record<string, unknown>;
+    const { error: upErr } = await supabase
+      .from("collections")
+      .update({
+        direction: {
+          ...previous,
+          chosenDirection: { name: data.name, pitch: data.pitch, mood: data.mood },
+          secondaryLanguage: data.secondaryLanguage,
+        } as never,
+      })
+      .eq("id", data.collectionId)
+      .eq("user_id", userId);
+    if (upErr) throw new Error(upErr.message);
+    return { ok: true };
   });

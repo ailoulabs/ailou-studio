@@ -227,6 +227,7 @@ export async function runSheetUnit(input: {
     avoid?: string[];
     fillers?: string[];
     category?: string;
+    secondaryLanguage?: { name?: string; en?: string; note?: string } | null;
   };
   const palette = ((collection.palette as string[]) ?? []).filter(Boolean);
   const motifsEn = (direction.motifs ?? []).map((m) => m.en).filter(Boolean);
@@ -332,6 +333,21 @@ export async function runSheetUnit(input: {
 // ------------------------------------------------------------------
 
 /** Motivos que continuam valendo: os do diretor, menos os que a artesã tirou. */
+/**
+ * Linguagem grafica secundaria da colecao, em ingles, para os prompts das pecas.
+ * Quando a pessoa restringiu a colecao a uma categoria ("somente frutas"), a lista de
+ * elementos permitidos nao inclui o ornamento, entao nao pedimos ele nas pecas para
+ * nao mandar desenhar e proibir ao mesmo tempo.
+ */
+function secondaryOf(direction: {
+  secondaryLanguage?: { en?: string } | null;
+  category?: string;
+}): string | undefined {
+  if (String(direction.category ?? "").trim() !== "") return undefined;
+  const en = String(direction.secondaryLanguage?.en ?? "").trim();
+  return en === "" ? undefined : en;
+}
+
 function allowedMotifsOf(
   direction: { motifs?: { name: string; en: string }[] },
   motifIndex: unknown,
@@ -465,6 +481,8 @@ export async function runPieceUnit(input: {
     shared?: string;
     pieces?: { pieceId: string; guidance: string }[];
     motifs?: { name: string; en: string }[];
+    category?: string;
+    secondaryLanguage?: { name?: string; en?: string; note?: string } | null;
   };
   const allowedMotifs = allowedMotifsOf(direction, collection["motifs"]);
   const guidance =
@@ -484,6 +502,7 @@ export async function runPieceUnit(input: {
     overrides: (piece.overrides ?? {}) as Record<string, number | string>,
     palette,
     style: String((collection["brief"] as Record<string, unknown> | null)?.["style"] ?? ""),
+    ...(secondaryOf(direction) ? { secondary: secondaryOf(direction)! } : {}),
     ...(allowedMotifs.length > 0 ? { allowedMotifs } : {}),
     ...(input.reinforce ? { reinforce: true } : {}),
   });
@@ -893,6 +912,8 @@ export async function runVariantUnit(input: {
       shared?: string;
       pieces?: { pieceId: string; guidance: string }[];
       motifs?: { name: string; en: string }[];
+      category?: string;
+      secondaryLanguage?: { name?: string; en?: string; note?: string } | null;
     };
     const allowedMotifs = allowedMotifsOf(direction, parent.motifs);
     const guidance = direction.pieces?.find((p) => p.pieceId === piece.id)?.guidance ?? "";
@@ -914,6 +935,7 @@ export async function runVariantUnit(input: {
         overrides: (piece.overrides ?? {}) as Record<string, number | string>,
         palette: variantPalette,
         style: String(parent.brief?.["style"] ?? ""),
+        ...(secondaryOf(direction) ? { secondary: secondaryOf(direction)! } : {}),
         ...(allowedMotifs.length > 0 ? { allowedMotifs } : {}),
       }),
       sheet: new Uint8Array(await sheet.data.arrayBuffer()),
