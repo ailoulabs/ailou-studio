@@ -59,6 +59,7 @@ const DIRECTION_SCHEMA = {
     "category",
     "styleLevels",
     "secondaryLanguage",
+    "look",
   ],
   properties: {
     summaryBullets: { type: "array", items: { type: "string" } },
@@ -78,6 +79,18 @@ const DIRECTION_SCHEMA = {
     },
     suggestedColors: { type: "array", items: { type: "string" } },
     paletteReason: { type: "string" },
+    look: {
+      type: "object",
+      additionalProperties: false,
+      required: ["technique", "ground", "layout", "paletteStrategy", "reason"],
+      properties: {
+        technique: { type: "string" },
+        ground: { type: "string" },
+        layout: { type: "string" },
+        paletteStrategy: { type: "string" },
+        reason: { type: "string" },
+      },
+    },
     secondaryLanguage: {
       type: "object",
       additionalProperties: false,
@@ -127,11 +140,24 @@ COORDENADOS DE APOIO (poá, listrado, xadrez, textura): escolha o par de cores d
 em inglês entre parênteses no final, qual é o fundo e qual é a marca, assim: (background color: #XXXXXX, dot color: #XXXXXX)
 ou (background color: #XXXXXX, stripe color: #XXXXXX). O contraste tem que ser forte: nunca bolinha branca ou off-white em fundo claro.
 No poá clássico o fundo é uma cor cheia da paleta e a bolinha é branca ou creme.
+IDENTIDADE VISUAL, obrigatória: preencha look escolhendo UM item de cada lista que vier em vocabulario.
+technique é a técnica de desenho, ground é o tratamento do fundo, layout é a distribuição dos motivos,
+paletteStrategy é o tipo de combinação de cor. Copie o nome exatamente como veio na lista.
+Em reason explique a combinação em uma frase, em português.
+Escolha pelo que serve ao tema, nunca pelo que é mais comum. Aquarela delicada sobre fundo claro é o
+caminho preguiçoso e já existe demais no mercado. Tema de churrasco, ferramenta, boteco ou noite pede
+fundo escuro e traço gráfico. Tema infantil pede traço lúdico. Tema rústico ou de festa popular pede
+gravura, bordado ou chita. Se duas opções servirem igualmente bem, prefira a menos óbvia.
+Não escolha sempre o primeiro item da lista.
+
 LINGUAGEM SECUNDÁRIA, obrigatória: toda coleção comercial tem duas linguagens, o assunto principal
-e uma linguagem gráfica secundária que costura o conjunto inteiro. Em coleções reais isso aparece assim:
-buganvília com azulejo português azul, pêssego com listra pintada e moldura ornamentada, xícara de café com jeans e patchwork.
+e uma linguagem gráfica secundária que costura o conjunto inteiro, aparecendo como moldura numa peça,
+como faixa ou filigrana em outra e solta entre os motivos na estampa corrida.
+Escolha uma de linguagensSecundarias do vocabulario.
 Se vier linguagemSecundariaEscolhida, ela já foi escolhida pela artesã: copie name, en e note exatamente como vieram
 em secondaryLanguage, sem trocar por outra e sem reescrever, e construa a coleção inteira em cima dela.
+Se vier lookEscolhido com technique ou ground preenchidos, copie esses dois para look sem trocar,
+e escolha só o que faltar (layout e paletteStrategy).
 Se vier direcaoEscolhida, respeite o clima e a promessa daquela direção em todas as orientações peça a peça.
 Só quando os dois vierem vazios é que você escolhe a linguagem secundária.
 Escolha uma linguagem secundária que converse com o tema e preencha secondaryLanguage:
@@ -333,6 +359,11 @@ export const creativeDirector = createServerFn({ method: "POST" })
     const asColors = (value: unknown) =>
       Array.isArray(value) ? value.filter((c): c is string => typeof c === "string") : [];
 
+    // Menu de identidade visual desta coleção. Amostra, não a lista inteira:
+    // lista longa demais o modelo ignora, e sempre a mesma lista ele ancora.
+    const { vocabMenuFor, menuAsText } = await import("@/lib/ai/vocabulary.server");
+    const directorMenu = menuAsText(vocabMenuFor(data.collectionId));
+
     const userContent: unknown[] = [
       {
         type: "text",
@@ -344,6 +375,9 @@ export const creativeDirector = createServerFn({ method: "POST" })
             uso: brief["usage"] ?? "",
             coresObrigatorias: asColors(brief["requiredColors"]),
             coresPreferidas: asColors(brief["preferredColors"]),
+            vocabulario: directorMenu,
+            lookEscolhido:
+              ((collection.direction ?? {}) as Record<string, unknown>)["look"] ?? null,
             direcaoEscolhida:
               ((collection.direction ?? {}) as Record<string, unknown>)["chosenDirection"] ?? null,
             linguagemSecundariaEscolhida:
@@ -777,11 +811,13 @@ const EXPLORE_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "pitch", "mood", "secondaryLanguage"],
+        required: ["name", "pitch", "mood", "technique", "ground", "secondaryLanguage"],
         properties: {
           name: { type: "string" },
           pitch: { type: "string" },
           mood: { type: "string" },
+          technique: { type: "string" },
+          ground: { type: "string" },
           secondaryLanguage: SECONDARY_LANGUAGE_SCHEMA,
         },
       },
@@ -792,9 +828,12 @@ const EXPLORE_SCHEMA = {
 const EXPLORE_SYSTEM = `Você é diretor criativo de estamparia têxtil brasileira. Sua tarefa aqui é abrir possibilidades, não fechar.
 
 Toda coleção comercial tem duas linguagens: o assunto principal, que a artesã já disse, e uma linguagem gráfica
-secundária que costura o conjunto inteiro. Buganvília com azulejo português. Pêssego com listra pintada e moldura
-ornamentada. Xícara de café com jeans e patchwork. É quase sempre a segunda linguagem que falta quando a pessoa
-descreve só o tema, e é ela que faz cinco peças parecerem uma família em vez de cinco desenhos do mesmo assunto.
+secundária que costura o conjunto inteiro, aparecendo como moldura numa peça, como faixa em outra e solta entre
+os motivos na estampa corrida. É quase sempre a segunda linguagem que falta quando a pessoa descreve só o tema,
+e é ela que faz cinco peças parecerem uma família em vez de cinco desenhos do mesmo assunto.
+
+Você vai receber em vocabulario as listas de técnicas, fundos, layouts, paletas e linguagens secundárias
+disponíveis. Escolha SEMPRE dentro dessas listas, copiando o nome exatamente como veio.
 
 PERGUNTAS: no máximo 2, e só sobre o que estiver de fato indefinido nesta ideia.
 Se a pessoa já disse o suficiente, devolva a lista vazia, sem inventar pergunta para preencher espaço.
@@ -809,7 +848,11 @@ Em pitch escreva uma frase dizendo como a coleção vai parecer na mesa posta.
 Em mood use duas ou três palavras de clima.
 Em secondaryLanguage preencha name em português para a tela, en em inglês curto para o prompt de imagem,
 e note dizendo em que peças ela aparece.
-As 3 linguagens secundárias têm de ser de famílias diferentes, nunca três variações de listra.
+DIVERGÊNCIA, a regra mais importante: as 3 direções têm de ser realmente diferentes umas das outras.
+Cada uma com uma technique de família diferente (não três técnicas de pintura, por exemplo), um ground
+diferente e uma linguagem secundária de família diferente. Se as três puderem ser descritas pela mesma
+frase trocando uma palavra, você falhou. Pelo menos uma das três tem de fugir do óbvio para o tema:
+se o assunto puxa naturalmente para aquarela clara e delicada, essa pode ser uma das três, nunca as três.
 Escolha coisas com estrutura gráfica própria, como azulejo, arabesco, listra, vichy, jeans, renda, ladrilho
 hidráulico, palha, cerâmica, xadrez ou poá. Nunca outra flor e nunca outra fruta, porque isso só repete o assunto.
 Respeite as exclusões: se a pessoa disse que não quer X, X não aparece em nenhuma das 3 direções.
@@ -835,6 +878,10 @@ export interface ExploreDirection {
   name: string;
   pitch: string;
   mood: string;
+  /** Técnica de desenho, nome em português vindo do vocabulário. */
+  technique: string;
+  /** Tratamento do fundo, nome em português vindo do vocabulário. */
+  ground: string;
   secondaryLanguage: SecondaryLanguage;
 }
 export interface ExploreResult {
@@ -875,6 +922,11 @@ export const exploreDirections = createServerFn({ method: "POST" })
     const previous = (collection.direction ?? {}) as Record<string, unknown>;
     const answers = data.answers ?? [];
 
+    // Mesma amostra que o diretor vai ver depois, para a direção escolhida
+    // continuar valendo na etapa 2.
+    const { vocabMenuFor, menuAsText } = await import("@/lib/ai/vocabulary.server");
+    const menu = menuAsText(vocabMenuFor(data.collectionId));
+
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${openAiKey()}`, "Content-Type": "application/json" },
@@ -893,6 +945,7 @@ export const exploreDirections = createServerFn({ method: "POST" })
               motivosEntendidos: previous["motifs"] ?? [],
               foraDoTema: previous["avoid"] ?? [],
               categoria: previous["category"] ?? "",
+              vocabulario: menu,
               respostasDaArtesa: answers,
             }),
           },
@@ -925,6 +978,8 @@ export const chooseDirection = createServerFn({ method: "POST" })
       name: z.string().min(1),
       pitch: z.string().default(""),
       mood: z.string().default(""),
+      technique: z.string().default(""),
+      ground: z.string().default(""),
       secondaryLanguage: z.object({
         name: z.string().min(1),
         en: z.string().min(1),
@@ -951,6 +1006,12 @@ export const chooseDirection = createServerFn({ method: "POST" })
           ...previous,
           chosenDirection: { name: data.name, pitch: data.pitch, mood: data.mood },
           secondaryLanguage: data.secondaryLanguage,
+          // Semente da identidade visual: o diretor completa layout e paleta.
+          look: {
+            ...((previous["look"] as Record<string, unknown> | undefined) ?? {}),
+            ...(data.technique ? { technique: data.technique } : {}),
+            ...(data.ground ? { ground: data.ground } : {}),
+          },
         } as never,
       })
       .eq("id", data.collectionId)

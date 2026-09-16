@@ -303,6 +303,7 @@ function StudioPage() {
             sheetReview?: SheetReviewJson;
             chosenDirection?: { name: string; pitch: string; mood: string };
             secondaryLanguage?: { name: string; en: string; note: string };
+            look?: { technique?: string; ground?: string };
             styleLevels?: {
               size?: number;
               density?: number;
@@ -347,6 +348,8 @@ function StudioPage() {
               name: directionJson.chosenDirection.name,
               pitch: directionJson.chosenDirection.pitch ?? "",
               mood: directionJson.chosenDirection.mood ?? "",
+              technique: directionJson.look?.technique ?? "",
+              ground: directionJson.look?.ground ?? "",
               secondaryLanguage: directionJson.secondaryLanguage,
             }
           : null,
@@ -706,6 +709,8 @@ function StudioPage() {
           name: chosen.name,
           pitch: chosen.pitch,
           mood: chosen.mood,
+          technique: chosen.technique,
+          ground: chosen.ground,
           secondaryLanguage: chosen.secondaryLanguage,
         },
       });

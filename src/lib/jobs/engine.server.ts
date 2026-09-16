@@ -17,6 +17,13 @@ import {
   type ProviderAttempt,
 } from "@/lib/ai/images.server";
 import { BUILD_STAMP } from "@/lib/build-stamp";
+import {
+  GROUNDS,
+  LAYOUTS,
+  PALETTES,
+  TECHNIQUES,
+  englishFor,
+} from "@/lib/ai/vocabulary.server";
 
 import {
   checkBands,
@@ -228,6 +235,12 @@ export async function runSheetUnit(input: {
     fillers?: string[];
     category?: string;
     secondaryLanguage?: { name?: string; en?: string; note?: string } | null;
+    look?: {
+      technique?: string;
+      ground?: string;
+      layout?: string;
+      paletteStrategy?: string;
+    } | null;
   };
   const palette = ((collection.palette as string[]) ?? []).filter(Boolean);
   const motifsEn = (direction.motifs ?? []).map((m) => m.en).filter(Boolean);
@@ -240,6 +253,7 @@ export async function runSheetUnit(input: {
     fillers: direction.fillers ?? [],
     styleDescription: styleDescription(String(brief["style"] ?? "")),
     style: String(brief["style"] ?? ""),
+    look: lookOf(direction),
     sharedDirection: direction.shared ?? "",
     palette,
   };
@@ -346,6 +360,37 @@ function secondaryOf(direction: {
   if (String(direction.category ?? "").trim() !== "") return undefined;
   const en = String(direction.secondaryLanguage?.en ?? "").trim();
   return en === "" ? undefined : en;
+}
+
+/**
+ * Traduz a identidade visual escolhida pelo diretor (nomes em portugues) nos
+ * fragmentos em ingles que vao para o modelo de imagem. O que nao casar com o
+ * vocabulario simplesmente nao entra, em vez de ir cru para o prompt.
+ */
+function lookOf(direction: {
+  look?: {
+    technique?: string;
+    ground?: string;
+    layout?: string;
+    paletteStrategy?: string;
+  } | null;
+}): {
+  technique?: string;
+  ground?: string;
+  layout?: string;
+  palette?: string;
+} {
+  const l = direction.look ?? {};
+  const technique = englishFor(TECHNIQUES, l.technique ?? "");
+  const ground = englishFor(GROUNDS, l.ground ?? "");
+  const layout = englishFor(LAYOUTS, l.layout ?? "");
+  const palette = englishFor(PALETTES, l.paletteStrategy ?? "");
+  return {
+    ...(technique ? { technique } : {}),
+    ...(ground ? { ground } : {}),
+    ...(layout ? { layout } : {}),
+    ...(palette ? { palette } : {}),
+  };
 }
 
 function allowedMotifsOf(
@@ -483,6 +528,12 @@ export async function runPieceUnit(input: {
     motifs?: { name: string; en: string }[];
     category?: string;
     secondaryLanguage?: { name?: string; en?: string; note?: string } | null;
+    look?: {
+      technique?: string;
+      ground?: string;
+      layout?: string;
+      paletteStrategy?: string;
+    } | null;
   };
   const allowedMotifs = allowedMotifsOf(direction, collection["motifs"]);
   const guidance =
@@ -502,6 +553,7 @@ export async function runPieceUnit(input: {
     overrides: (piece.overrides ?? {}) as Record<string, number | string>,
     palette,
     style: String((collection["brief"] as Record<string, unknown> | null)?.["style"] ?? ""),
+    look: lookOf(direction),
     ...(secondaryOf(direction) ? { secondary: secondaryOf(direction)! } : {}),
     ...(allowedMotifs.length > 0 ? { allowedMotifs } : {}),
     ...(input.reinforce ? { reinforce: true } : {}),
@@ -914,6 +966,12 @@ export async function runVariantUnit(input: {
       motifs?: { name: string; en: string }[];
       category?: string;
       secondaryLanguage?: { name?: string; en?: string; note?: string } | null;
+      look?: {
+        technique?: string;
+        ground?: string;
+        layout?: string;
+        paletteStrategy?: string;
+      } | null;
     };
     const allowedMotifs = allowedMotifsOf(direction, parent.motifs);
     const guidance = direction.pieces?.find((p) => p.pieceId === piece.id)?.guidance ?? "";
@@ -935,6 +993,7 @@ export async function runVariantUnit(input: {
         overrides: (piece.overrides ?? {}) as Record<string, number | string>,
         palette: variantPalette,
         style: String(parent.brief?.["style"] ?? ""),
+        look: lookOf(direction),
         ...(secondaryOf(direction) ? { secondary: secondaryOf(direction)! } : {}),
         ...(allowedMotifs.length > 0 ? { allowedMotifs } : {}),
       }),

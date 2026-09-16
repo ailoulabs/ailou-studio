@@ -8,6 +8,8 @@ export interface ChosenDirection {
   name: string;
   pitch: string;
   mood: string;
+  technique: string;
+  ground: string;
   secondaryLanguage: { name: string; en: string; note: string };
 }
 
@@ -58,11 +60,27 @@ export function DirectionChooser({
             {chosen.pitch}
           </p>
         )}
-        <p className="mt-4 rounded-lg border border-border bg-secondary/50 p-4 text-sm leading-relaxed text-foreground">
-          <span className="font-medium">Linguagem secundária: </span>
-          {chosen.secondaryLanguage.name}
-          {chosen.secondaryLanguage.note ? `. ${chosen.secondaryLanguage.note}` : ""}
-        </p>
+        <dl className="mt-4 space-y-1.5 rounded-lg border border-border bg-secondary/50 p-4 text-sm leading-relaxed text-foreground">
+          {chosen.technique && (
+            <div className="flex gap-2">
+              <dt className="font-medium">Técnica:</dt>
+              <dd className="text-muted-foreground">{chosen.technique}</dd>
+            </div>
+          )}
+          {chosen.ground && (
+            <div className="flex gap-2">
+              <dt className="font-medium">Fundo:</dt>
+              <dd className="text-muted-foreground">{chosen.ground}</dd>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-medium">Linguagem secundária:</dt>
+            <dd className="text-muted-foreground">
+              {chosen.secondaryLanguage.name}
+              {chosen.secondaryLanguage.note ? `. ${chosen.secondaryLanguage.note}` : ""}
+            </dd>
+          </div>
+        </dl>
       </section>
     );
   }
@@ -163,8 +181,11 @@ export function DirectionChooser({
                 {d.mood}
               </span>
               <span className="mt-1.5 text-base font-medium text-foreground">{d.name}</span>
-              <span className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+              <span className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {d.pitch}
+              </span>
+              <span className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">
+                {[d.technique, d.ground].filter(Boolean).join(" · ")}
               </span>
               <span className="mt-3 inline-flex items-center gap-1.5 text-sm text-foreground opacity-0 transition group-hover:opacity-100">
                 <Check className="size-4" strokeWidth={1.5} />

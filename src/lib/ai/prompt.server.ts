@@ -54,35 +54,69 @@ const BLENDER_CONTRAST = [
 ];
 
 /**
- * Acabamento comercial, extraido da colecao de referencia da Casa Criativa.
- * A arte real tem duas camadas: um fundo de linho com trama impressa na propria
- * arte, e os motivos pintados por cima, opacos, onde a trama para na borda.
+ * A identidade visual da colecao nao e mais fixa no prompt.
+ *
+ * Antes daqui saiam "linho creme claro" e "modelagem botanica" para toda peca,
+ * o que fazia coleccao nenhuma escapar do mesmo visual e quebrava tema que nao
+ * e floral: churrasco em fundo preto, pinguim de Natal, ceu estrelado.
+ *
+ * Agora o diretor criativo escolhe tecnica, fundo, layout e paleta no
+ * vocabulario (vocabulary.server.ts) e o que chega aqui ja vem em ingles.
  */
-const MOTIF_RENDERING =
-  "MOTIF RENDERING, commercial botanical quality: paint every element as a finished botanical watercolor illustration with real volume, never a flat silhouette. Light falls from one side, so each fruit and petal has a lit side, a deeper warmer shaded side and a soft highlight. Show the internal detail: petal veining and visible stamens in the flowers, the vertical crease and the soft fuzz of the fruit, the midrib and the turned edge of the leaves, the woody grain of the branch. Edges are confident and defined, never dissolved, never blurry, never out of focus. Translucent petals may overlap and let the layer beneath show through. Keep a strong scale contrast: one or two hero motifs clearly larger, surrounded by much smaller buds, berries and single leaves.";
+export interface LookSpec {
+  /** Tecnica de renderizacao, em ingles. */
+  technique?: string;
+  /** Tratamento do fundo, em ingles. */
+  ground?: string;
+  /** Distribuicao dos motivos, em ingles. */
+  layout?: string;
+  /** Estrategia de paleta, em ingles. */
+  palette?: string;
+}
 
-const LINEN_GROUND =
-  "GROUND LAYER: every empty area is a plain linen ground in the lightest color of the collection palette, carrying a fine, even, regularly woven texture printed into the artwork itself, subtle and low contrast, visible across the whole background. This weave is a flat printed texture seen straight from above: never a photograph of cloth, never folds, never drape, never 3D. The motifs are painted opaquely on top of it, so the weave stops at the edge of each fruit, flower and leaf and never shows through them.";
+/**
+ * O que vale para qualquer estampa comercial, independente de tecnica.
+ * E so isto que continua fixo: o resto virou escolha.
+ */
+const CRAFT =
+  "CRAFT, what separates a finished commercial print from clip art: keep a strong scale contrast, one or two hero motifs clearly larger, surrounded by much smaller supporting ones; let motifs cross the boundaries of the design, running over a frame rule, over the edge of a band or off the edge of the image, instead of stopping neatly short of them; keep the quiet areas genuinely empty, only ground, never a faint wash or a stray mark; every element is finished and deliberate, nothing blurred, smeared, half drawn or out of focus.";
 
 const PAINTED_CONSTRAINTS =
   "CONSTRAINTS: no text, no letters, no labels, no numbers, no watermark, no signature; no mockup, no product photo, no sewn item, no table, no plate, no cutlery, no props, no hands; no perspective, no folds, no draped cloth, no 3D; no shadow cast onto the ground, no glow, no halo, no spotlight, no vignette; no blur and no out-of-focus area anywhere in the image; the artwork is flat, seen straight from above, filling the whole image with no white margin; no drawn outline border around the artwork unless explicitly requested above.";
 
-/** Estilos que pedem modelagem botanica. Ludico e minimalista sao chapados de proposito. */
-const LINEN_GROUND_BLENDER =
-  "GROUND: paint the design on a plain linen ground in the lightest color of the collection palette, carrying a fine, even, regularly woven texture printed into the artwork itself, subtle and low contrast. The colored marks are printed onto that linen, so the weave stays faintly visible through them instead of covering it. This weave is a flat printed texture seen straight from above: never a photograph of cloth, never folds, never 3D.";
-
-const MODELLED_STYLES = new Set(["aquarela-delicada", "botanico-vintage"]);
-
-/** Sem estilo definido a colecao cai no padrao aquarela, que e modelado. */
-export function isModelledStyle(style?: string): boolean {
-  const key = (style ?? "").trim();
-  return key === "" || MODELLED_STYLES.has(key);
+/** Copia o look sem o layout, para os coordenados que tem geometria propria. */
+function withoutLayout(look: LookSpec | undefined): LookSpec {
+  const { layout: _ignored, ...rest } = look ?? {};
+  return rest;
 }
 
-/** Blocos de acabamento aplicados so onde fazem sentido. */
-function finishFor(style: string | undefined, ground: boolean): string[] {
-  if (!isModelledStyle(style)) return [];
-  return ground ? [MOTIF_RENDERING, LINEN_GROUND] : [MOTIF_RENDERING];
+/** Blocos de identidade visual, montados a partir do que o diretor escolheu. */
+function lookBlocks(look: LookSpec | undefined, withLayout: boolean): string[] {
+  const l = look ?? {};
+  const out: string[] = [];
+  if (l.technique) {
+    out.push(
+      `TECHNIQUE: ${l.technique}. Every single element of this artwork is made with this technique and no other, including the ornaments and the background treatment.`,
+    );
+  }
+  if (l.ground) {
+    out.push(
+      `GROUND: ${l.ground}. This ground is the same across every piece of the collection. It is a flat printed surface seen straight from above, never a photograph of cloth, never folds, never 3D.`,
+    );
+  }
+  if (withLayout && l.layout) out.push(`LAYOUT: ${l.layout}.`);
+  if (l.palette) out.push(`COLOUR FEEL: ${l.palette}.`);
+  out.push(CRAFT);
+  return out;
+}
+
+/** Estilos de borda mole, que pedem listra pincelada em vez de listra reta. */
+const SOFT_EDGE_STYLES = new Set(["aquarela-delicada", "botanico-vintage"]);
+
+/** Sem estilo definido a colecao cai no padrao aquarela, de borda mole. */
+export function isModelledStyle(style?: string): boolean {
+  const key = (style ?? "").trim();
+  return key === "" || SOFT_EDGE_STYLES.has(key);
 }
 
 /** Linha de controles de estilo usada em todos os prompts. */
@@ -319,6 +353,8 @@ export function buildImagePrompt(input: {
   style?: string;
   /** Linguagem grafica secundaria da colecao, em ingles, para os prompts. */
   secondary?: string;
+  /** Identidade visual escolhida pelo diretor: tecnica, fundo, layout, paleta. */
+  look?: LookSpec;
 }): string {
   const o = input.overrides ?? {};
   const parts = [
@@ -326,7 +362,7 @@ export function buildImagePrompt(input: {
     input.reinforce ? reinforcementFor(input.app) : "",
     [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),
     styleControls(o, input.app.family === "painel"),
-    ...finishFor(input.style, true),
+    ...lookBlocks(input.look, input.app.family === "corrida"),
     `AUTHORITATIVE COLOR PALETTE, use only these colors and their tints: ${input.palette.join(", ")}.`,
     PAINTED_CONSTRAINTS,
   ];
@@ -366,6 +402,8 @@ export function buildMotifSheetPrompt(input: {
   strict?: boolean;
   /** Estilo da colecao: decide se entra a modelagem botanica. */
   style?: string;
+  /** Identidade visual escolhida pelo diretor: tecnica, fundo, layout, paleta. */
+  look?: LookSpec;
 }): string {
   const background = input.plainBackgroundHex
     ? `Place every element over a single flat uniform ${input.plainBackgroundHex} background, exactly the same tone everywhere, with no gradient and no texture.`
@@ -378,7 +416,7 @@ export function buildMotifSheetPrompt(input: {
       ? `STRICT: the sheet must contain only these elements and nothing else: ${[...motifs, ...fillers].join("; ")}. Any element outside this list is a rejection.`
       : "",
     input.sharedDirection ? `DIRECTION: ${input.sharedDirection}` : "",
-    ...finishFor(input.style, false),
+    ...lookBlocks(input.look, false),
     background,
     "CONSTRAINTS: elements arranged in a loose grid with generous empty space between them, nothing touching the image edges, no text, no labels, no numbers, no watermark, no drop shadows, no mockup, flat illustration only.",
   ]
@@ -558,6 +596,8 @@ export function buildFromSheetPrompt(input: {
   style?: string;
   /** Linguagem grafica secundaria da colecao, em ingles, para os prompts. */
   secondary?: string;
+  /** Identidade visual escolhida pelo diretor: tecnica, fundo, layout, paleta. */
+  look?: LookSpec;
 }): string {
   const o = input.overrides ?? {};
   const repeat = input.app.family !== "painel";
@@ -578,7 +618,7 @@ export function buildFromSheetPrompt(input: {
       "COLOR PAIR: follow exactly the background color and the mark color stated above; the marks must contrast clearly with the ground, never off-white marks on a light ground.",
       `CONTRAST LEVEL: ${BLENDER_CONTRAST[levelIndex(o.contrast)]!}.`,
       `AUTHORITATIVE COLOR PALETTE, use only these colors and their tints: ${input.palette.join(", ")}.`,
-      LINEN_GROUND_BLENDER,
+      ...lookBlocks(withoutLayout(input.look), false),
       `${PAINTED_CONSTRAINTS} No gradients other than the requested watercolor wash.`,
     ]
       .filter(Boolean)
@@ -596,7 +636,7 @@ export function buildFromSheetPrompt(input: {
     input.reinforce ? reinforcementFor(input.app) : "",
     [input.sharedDirection, input.pieceGuidance].filter(Boolean).join(" "),
     styleControls(o, input.app.family === "painel"),
-    ...finishFor(input.style, true),
+    ...lookBlocks(input.look, input.app.family === "corrida"),
     `AUTHORITATIVE COLOR PALETTE, use only these colors and their tints: ${input.palette.join(", ")}.`,
     PAINTED_CONSTRAINTS,
   ]

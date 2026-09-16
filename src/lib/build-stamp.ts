@@ -1,10 +1,17 @@
 /** Marca do build em execução. Serve para saber qual versão atendeu cada unidade. */
 declare const __BUILD_STAMP__: string | undefined;
+declare const __APP_VERSION__: string | undefined;
 
 export const BUILD_STAMP: string =
   typeof __BUILD_STAMP__ === "string" && __BUILD_STAMP__ ? __BUILD_STAMP__ : "dev";
 
+/** Versao semantica vinda do package.json, sem o "v". */
+export const APP_VERSION: string =
+  typeof __APP_VERSION__ === "string" && __APP_VERSION__ ? __APP_VERSION__ : "0.0.0";
+
 export interface BuildVersion {
+  /** Versao para exibir, ja com o "v" na frente. */
+  label: string;
   /** Commit curto, o que casa com o git log. */
   commit: string;
   /** Data e hora do build no horário de Brasília, vazio quando não dá para ler. */
@@ -23,8 +30,9 @@ const PAD = (n: number) => String(n).padStart(2, "0");
  * os dois quebraria a hidratação do React.
  */
 export function formatBuildStamp(stamp: string = BUILD_STAMP): BuildVersion {
+  const label = `v${APP_VERSION}`;
   const match = /^(.*)-(\d{12})$/.exec(stamp);
-  if (!match) return { commit: stamp, when: "" };
+  if (!match) return { label, commit: stamp, when: "" };
 
   const commit = match[1] ?? stamp;
   const ts = match[2] ?? "";
@@ -35,10 +43,10 @@ export function formatBuildStamp(stamp: string = BUILD_STAMP): BuildVersion {
     Number(ts.slice(8, 10)),
     Number(ts.slice(10, 12)),
   );
-  if (Number.isNaN(utc)) return { commit, when: "" };
+  if (Number.isNaN(utc)) return { label, commit, when: "" };
 
   // Brasília é UTC-3 o ano inteiro desde que o horário de verão acabou, em 2019.
   const d = new Date(utc - 3 * 60 * 60 * 1000);
   const when = `${PAD(d.getUTCDate())}/${PAD(d.getUTCMonth() + 1)} ${PAD(d.getUTCHours())}:${PAD(d.getUTCMinutes())}`;
-  return { commit, when };
+  return { label, commit, when };
 }

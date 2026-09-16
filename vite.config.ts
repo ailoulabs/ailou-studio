@@ -4,6 +4,7 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 /**
  * Carimbo de versão gravado no build: commit curto quando existir, mais a hora do build.
@@ -26,6 +27,15 @@ function buildStamp(): string {
   return `${commit}-${now}`;
 }
 
+/** Versao semantica declarada no package.json. Voce sobe ela a cada entrega. */
+const appVersion: string = (() => {
+  try {
+    return String(JSON.parse(readFileSync("./package.json", "utf8")).version ?? "0.0.0");
+  } catch {
+    return "0.0.0";
+  }
+})();
+
 export default defineConfig({
   plugins: [
     tsConfigPaths(),
@@ -36,7 +46,10 @@ export default defineConfig({
     }),
     viteReact(),
   ],
-  define: { __BUILD_STAMP__: JSON.stringify(buildStamp()) },
+  define: {
+    __BUILD_STAMP__: JSON.stringify(buildStamp()),
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   server: { host: true, port: 8080 },
   // A função serverless montada em build.mjs não carrega node_modules ao lado,
   // então o bundle SSR precisa ser autossuficiente: embute todas as dependências.
