@@ -33,7 +33,7 @@ TECHNIQUE: chita brasileira. Flat saturated colour areas, no gradients, bold dar
 
 GROUND AND PALETTE: warm cream ground. Palette led by terracotta and coffee brown, with mustard yellow, deep green and a little cherry red as accents, cream highlights, dark-brown outlines.
 
-COMPOSITION: tossed all-over layout, no visible grid, motifs at three sizes. Dense: the cream ground shows only as small gaps between motifs, never as open areas. Natural overlaps. Elements run off all four edges so the artwork reads as a cut from a continuous fabric. No motif isolated in the centre.
+COMPOSITION: tossed all-over layout, no visible grid, motifs at three sizes. Dense: the cream ground shows only as small gaps between motifs, never as open areas. Natural overlaps. Elements run off all four edges so the artwork reads as a cut from a continuous fabric. No motif isolated in the centre. VARIETY: no two motifs are identical copies; every repetition of a hero changes its pose, angle or size, and the placement is never mirrored or symmetric.
 
 ${RENDER_BLOCK}`;
 
@@ -48,7 +48,7 @@ Escreva UM prompt em inglês, seguindo exatamente este molde, nesta ordem, um bl
 5. FILLERS: "at least four kinds, mixed evenly:" com os quatro nomeados, e "No single filler may dominate."
 6. TECHNIQUE: use o texto da técnica exatamente como foi enviado, sem trocar por outra.
 7. GROUND AND PALETTE: fundo nomeado, "Palette led by X and Y, with A, B and C as accents", cor do contorno quando a técnica tem contorno. Se a técnica fixa cores (azulejo azul e branco, lousa preta), obedeça.
-8. COMPOSITION: "tossed all-over layout, no visible grid, motifs at three sizes. Dense: the <fundo> ground shows only as small gaps between motifs, never as open areas. Natural overlaps. Elements run off all four edges so the artwork reads as a cut from a continuous fabric. No motif isolated in the centre."
+8. COMPOSITION: "tossed all-over layout, no visible grid, motifs at three sizes. Dense: the <fundo> ground shows only as small gaps between motifs, never as open areas. Natural overlaps. Elements run off all four edges so the artwork reads as a cut from a continuous fabric. No motif isolated in the centre. VARIETY: no two motifs are identical copies; every repetition of a hero changes its pose, angle or size, and the placement is never mirrored or symmetric."
 9. RENDER: copie este bloco sem mudar nada: "${RENDER_BLOCK}"
 
 Regras:
@@ -96,7 +96,7 @@ export function extractBlock(prompt: string, label: string): string {
 
 const ROLE_GUIDANCE: Record<string, string> = {
   coordenado:
-    "ROLE: a companion print, lighter than the principal. Use the supporting motifs and the secondary layer of the reference at a smaller scale, more air between them, so it sits beside the principal without competing with it.",
+    "ROLE: a companion print of the same collection. The hero motifs of the reference MUST appear, drawn at about two thirds of their size in the reference and in new poses, together with the supporting motifs and the secondary layer; medium density with a little more ground showing than the principal. It must be recognisable at a glance as the same collection, never a print made only of fillers.",
   apoio:
     "ROLE: a quiet support print. Use only one or two of the smallest elements of the reference (fillers, sprigs, tiny flowers), small and evenly scattered, with plenty of plain ground in the same colour as the reference ground.",
 };
@@ -131,6 +131,37 @@ export function buildCoordinatePrompt(input: {
   const technique = extractBlock(input.masterPrompt, "TECHNIQUE");
   const palette = extractBlock(input.masterPrompt, "GROUND AND PALETTE");
   const blender = blenderKindOf(input.app);
+
+  // Guardanapo (canto carregado): com a principal anexada o modelo copiava a
+  // referência ou pintava um guardanapo de verdade com bainha. Sem imagem, o
+  // próprio prompt da principal descreve os motivos, a técnica e as cores; só a
+  // composição muda.
+  const frames = (input.app.params ?? {})["frames"] as { accent?: string } | undefined;
+  if (input.app.family === "painel" && frames?.accent === "corner") {
+    const identity = [
+      "SUBJECT",
+      "DECORATION ON THE OBJECTS",
+      "BOTANICAL VARIETY",
+      "SECONDARY LAYER",
+      "TECHNIQUE",
+      "GROUND AND PALETTE",
+    ]
+      .map((label) => extractBlock(input.masterPrompt, label))
+      .filter(Boolean)
+      .join("\n\n");
+    return {
+      prompt: [
+        `You are a senior surface-pattern designer painting one piece of a coordinated home-textile collection: ${input.pieceName}. The collection's motifs, technique and colours are described below and must be kept exactly; only the composition follows the PRODUCT FORMAT.`,
+        identity,
+        formatSection(input.app),
+        "The cluster is built from the hero motifs and the secondary layer described above, at full size and full detail. Everything outside the cluster is only the plain ground colour. This is flat printed artwork: no hem, no stitched edge, no fabric weave, no folded cloth, no napkin object.",
+        RENDER_BLOCK,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+      needsReference: false,
+    };
+  }
 
   if (blender) {
     return {

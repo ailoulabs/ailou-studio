@@ -6,7 +6,7 @@
  * instantânea e emendando certinho, com as cores da paleta da coleção.
  */
 
-import { encode } from "fast-png";
+import { decode, encode } from "fast-png";
 
 export interface SolidSpec {
   layout: "dots" | "plaid" | "stripe";
@@ -189,4 +189,61 @@ export function solidColorsOf(palette: string[]): { ground: string; mark: string
       ? preferred
       : (far ?? "#8A5A44");
   return { ground, mark };
+}
+
+/**
+ * Cores lidas da própria principal pintada: o fundo é a cor mais frequente e a
+ * marca é a cor frequente mais distante dele. Assim o poá acompanha a principal
+ * mesmo quando um ajuste ("fundo escuro", "trocar as cores") mudou a paleta.
+ */
+export function colorsFromImage(
+  png: Uint8Array,
+  fallback: { ground: string; mark: string },
+): { ground: string; mark: string } {
+  try {
+    const img = decode(png);
+    const channels = img.channels;
+    const data = img.data as Uint8Array | Uint16Array;
+    const shift = img.depth === 16 ? 8 : 0;
+    const step = Math.max(1, Math.floor(Math.sqrt((img.width * img.height) / 60000)));
+    const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+    for (let y = 0; y < img.height; y += step) {
+      for (let x = 0; x < img.width; x += step) {
+        const o = (y * img.width + x) * channels;
+        const r = (data[o] ?? 0) >> shift;
+        const g = (data[o + 1] ?? 0) >> shift;
+        const b = (data[o + 2] ?? 0) >> shift;
+        const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+        const cur = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+        cur.n += 1;
+        cur.r += r;
+        cur.g += g;
+        cur.b += b;
+        buckets.set(key, cur);
+      }
+    }
+    const list = [...buckets.values()]
+      .map((c) => ({ n: c.n, rgb: [c.r / c.n, c.g / c.n, c.b / c.n] as Rgb }))
+      .sort((a, b) => b.n - a.n);
+    const top = list[0];
+    if (!top) return fallback;
+    const lum = (c: Rgb) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+    const hex = (c: Rgb) =>
+      `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+    const groundLum = lum(top.rgb);
+    // Marca: cor frequente com contraste real contra o fundo, preferindo as vivas.
+    const total = list.reduce((acc, c) => acc + c.n, 0);
+    const candidate = list
+      .slice(1)
+      .filter((c) => Math.abs(lum(c.rgb) - groundLum) >= 70 && c.n / total >= 0.005)
+      .map((c) => {
+        const [r, g, b] = c.rgb;
+        const sat = Math.max(r, g, b) - Math.min(r, g, b);
+        return { c, score: c.n * (1 + sat / 128) };
+      })
+      .sort((a, b) => b.score - a.score)[0]?.c;
+    return { ground: hex(top.rgb), mark: candidate ? hex(candidate.rgb) : fallback.mark };
+  } catch {
+    return fallback;
+  }
 }

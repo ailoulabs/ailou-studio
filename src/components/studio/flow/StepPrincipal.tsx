@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { FlowPiece, FlowVersion } from "@/lib/flow-types";
-import {
-  ADJUSTMENT_GROUPS,
-  ADJUSTMENTS,
-  buildPrincipalPrompt,
-  toggleAdjustment,
-} from "@/lib/studio-flow";
+import { ADJUSTMENT_GROUPS, ADJUSTMENTS, buildPrincipalPrompt } from "@/lib/studio-flow";
+
+/** Valor do "Como está" nas listas: nenhum ajuste daquele grupo. */
+const NONE = "__nada__";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -187,30 +192,39 @@ export function StepPrincipal({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Ajustes
             </p>
-            {ADJUSTMENT_GROUPS.map((group) => (
-              <div key={group.id} className="flex flex-wrap items-center gap-2">
-                <span className="w-36 shrink-0 text-sm text-muted-foreground">{group.label}</span>
-                {ADJUSTMENTS.filter((a) => a.group === group.id).map((a) => {
-                  const on = pending.includes(a.id);
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
+            <div className="grid gap-3 sm:grid-cols-2">
+              {ADJUSTMENT_GROUPS.map((group) => {
+                const options = ADJUSTMENTS.filter((a) => a.group === group.id);
+                const current = options.find((a) => pending.includes(a.id))?.id ?? NONE;
+                return (
+                  <label key={group.id} className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">{group.label}</span>
+                    <Select
+                      value={current}
                       disabled={generating || !hasImage}
-                      onClick={() => setPending((prev) => toggleAdjustment(prev, a.id))}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-sm transition disabled:opacity-50",
-                        on
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background hover:border-primary/60",
-                      )}
+                      onValueChange={(value) =>
+                        setPending((prev) => {
+                          const without = prev.filter((id) => !options.some((o) => o.id === id));
+                          return value === NONE ? without : [...without, value];
+                        })
+                      }
                     >
-                      {a.label}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
+                      <SelectTrigger className="h-9 bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>Como está</SelectItem>
+                        {options.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                );
+              })}
+            </div>
             <div className="space-y-1">
               <span className="text-sm text-muted-foreground">Ou com suas palavras</span>
               <Input

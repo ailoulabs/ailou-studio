@@ -777,7 +777,7 @@ export async function runPromptUnit(input: {
   const { buildPrincipalPrompt, buildCoordinatePrompt } = await import(
     "@/lib/ai/master-prompt.server"
   );
-  const { drawSolidTile, solidSpecOf, solidColorsOf } = await import(
+  const { drawSolidTile, solidSpecOf, solidColorsOf, colorsFromImage } = await import(
     "@/lib/assembly/solids.server"
   );
 
@@ -829,7 +829,22 @@ export async function runPromptUnit(input: {
   if (solid) {
     const startedAt = Date.now();
     try {
-      const colors = solidColorsOf(palette);
+      // As cores vêm da principal pintada; a paleta gravada é só o plano B.
+      let colors = solidColorsOf(palette);
+      const { data: principal } = await db
+        .from("pieces")
+        .select("image_path")
+        .eq("collection_id", piece.collection_id)
+        .eq("role", "principal")
+        .not("image_path", "is", null)
+        .limit(1)
+        .maybeSingle();
+      if (principal?.image_path) {
+        const file = await db.storage.from("pieces").download(principal.image_path);
+        if (!file.error && file.data) {
+          colors = colorsFromImage(new Uint8Array(await file.data.arrayBuffer()), colors);
+        }
+      }
       const bytes = drawSolidTile({ spec: solid, groundHex: colors.ground, markHex: colors.mark });
       const path = `${input.userId}/${piece.collection_id}/${piece.id}.png`;
       const up = await db.storage
