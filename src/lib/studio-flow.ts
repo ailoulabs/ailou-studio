@@ -247,6 +247,11 @@ export const USAGES: UsageCard[] = KITS.filter((k) => USAGE_EMOJI[k.usage]).map(
 
 /** Estampa corrida grande do kit, que faz o papel de peça principal. */
 export function principalAppFor(applicationIds: string[]): string {
+  // Preferência: a estampa principal do catálogo, depois a toalha, depois
+  // qualquer corrida grande do kit.
+  for (const preferred of ["estampa-principal", "toalha-de-mesa"]) {
+    if (applicationIds.includes(preferred)) return preferred;
+  }
   for (const id of applicationIds) {
     const app = getApplication(id);
     if (!app || app.family !== "corrida") continue;

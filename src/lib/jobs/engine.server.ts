@@ -773,9 +773,12 @@ export async function runPromptUnit(input: {
   signal: AbortSignal;
 }): Promise<void> {
   const db = await admin();
-  const { imageSizeFor } = await import("@/lib/ai/prompt.server");
+  const { imageSizeFor, isSolidDotApp } = await import("@/lib/ai/prompt.server");
   const { buildPrincipalPrompt, buildCoordinatePrompt } = await import(
     "@/lib/ai/master-prompt.server"
+  );
+  const { drawSolidTile, solidSpecOf, solidColorsOf } = await import(
+    "@/lib/assembly/solids.server"
   );
 
   const { data: piece, error } = await db
@@ -820,6 +823,50 @@ export async function runPromptUnit(input: {
   let prompt: string;
   let reference: Uint8Array | undefined;
   let size = imageSizeFor(spec);
+
+  // Poá, vichy e listrado chapados: geometria por código, sem pintor.
+  const solid = input.kind === "coordenado" && isSolidDotApp(spec) ? solidSpecOf(spec.params) : null;
+  if (solid) {
+    const startedAt = Date.now();
+    try {
+      const colors = solidColorsOf(palette);
+      const bytes = drawSolidTile({ spec: solid, groundHex: colors.ground, markHex: colors.mark });
+      const path = `${input.userId}/${piece.collection_id}/${piece.id}.png`;
+      const up = await db.storage
+        .from("pieces")
+        .upload(path, bytes, { contentType: "image/png", upsert: true });
+      if (up.error) throw new Error("Não foi possível salvar a imagem gerada.");
+      const saved = await db
+        .from("pieces")
+        .update({
+          status: "pronta",
+          image_path: path,
+          prompt: `solid:${solid.layout} ground=${colors.ground} mark=${colors.mark}`,
+          error: null,
+          made_by: "app",
+          image_print_path: null,
+          print_dpi: null,
+          composition: null,
+          seam: { ok: true, score: 0 } as never,
+          timings: {
+            generateMs: Date.now() - startedAt,
+            totalMs: Date.now() - startedAt,
+            provider: "app",
+            model: "geometria",
+            size: "1536",
+            build: BUILD_STAMP,
+            flow: "solid",
+          } as never,
+        })
+        .eq("id", piece.id);
+      assertWrite(saved.error, "Não foi possível registrar a peça pronta.");
+      return;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Falha ao desenhar o coordenado.";
+      await db.from("pieces").update({ status: "erro", error: message }).eq("id", piece.id);
+      throw new Error(message);
+    }
+  }
 
   if (input.kind === "principal") {
     prompt = buildPrincipalPrompt(master, brief.adjustments ?? []);

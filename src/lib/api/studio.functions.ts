@@ -252,3 +252,53 @@ export const choosePrincipalVersion = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ------------------------------------------------------------------
+// Miniaturas dos temas (passo 1). Geradas uma vez pelo administrador,
+// guardadas no bucket público "temas" e servidas direto pela URL.
+// ------------------------------------------------------------------
+
+const THUMB_STYLE =
+  "A square swatch of a finished commercial textile print, seen straight from above, edge to edge. Delicate gouache illustration with soft outlines, on a warm cream ground, dense tossed all-over layout with motifs at three sizes, natural overlaps, elements running off the edges. No text, no letters, no border, no mockup, no product photo, no shadows.";
+
+export const generateThemeThumbnails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      /** Temas específicos para (re)gerar; sem isso, gera os que faltam. */
+      ids: z.array(z.string().max(60)).max(6).optional(),
+      limit: z.number().int().min(1).max(6).optional(),
+    }).parse,
+  )
+  .handler(async ({ data, context }): Promise<{ done: string[]; remaining: number }> => {
+    const { data: isAdmin } = await context.supabase.rpc("is_admin");
+    if (isAdmin !== true) throw new Error("Somente administradores podem gerar as miniaturas.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { generateImage } = await import("@/lib/ai/gemini.server");
+    const { ALL_THEMES } = await import("@/lib/studio-flow");
+
+    const { data: existing } = await supabaseAdmin.storage.from("temas").list("", { limit: 200 });
+    const have = new Set((existing ?? []).map((f) => f.name));
+    const wanted = data.ids ? new Set(data.ids) : null;
+    const pending = ALL_THEMES.filter((t) =>
+      wanted ? wanted.has(t.id) : !have.has(`${t.id}.png`),
+    );
+    const batch = pending.slice(0, data.limit ?? 3);
+
+    const done: string[] = [];
+    for (const theme of batch) {
+      const out = await generateImage({
+        prompt: `${THUMB_STYLE}\n\nTHEME "${theme.name}": ${theme.desc}.`,
+        aspectRatio: "1:1",
+        imageSize: "512px",
+        thinkingLevel: "minimal",
+      });
+      const up = await supabaseAdmin.storage
+        .from("temas")
+        .upload(`${theme.id}.png`, out.bytes, { contentType: "image/png", upsert: true });
+      if (up.error) throw new Error(`Não foi possível salvar a miniatura de ${theme.name}.`);
+      done.push(theme.id);
+    }
+    return { done, remaining: pending.length - done.length };
+  });

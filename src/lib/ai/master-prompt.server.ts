@@ -148,12 +148,18 @@ export function buildCoordinatePrompt(input: {
     };
   }
 
+  const isPanel = input.app.family === "painel";
   return {
     prompt: [
-      `You are the same surface-pattern designer who painted the attached image, the PRINCIPAL PRINT of a coordinated collection. Now paint a COORDINATE piece of the same collection: ${input.pieceName}.`,
-      "IDENTITY, keep it exactly: the same technique, the same drawing hand, the same palette, the same ground colour and the same motifs as the reference. Do not introduce new colours or new kinds of motif. The reference is an identity guide, not a layout: compose the new piece freely for its own format, redrawing every element from scratch at the right size, never copying the reference as a whole.",
-      ROLE_GUIDANCE[input.role] ?? ROLE_GUIDANCE["coordenado"],
+      `You are the same surface-pattern designer who painted the attached image, the PRINCIPAL PRINT of a coordinated collection. Now paint a DIFFERENT piece of the same collection: ${input.pieceName}. This new piece has its own format, described next, and must look clearly different from the attached image.`,
       formatSection(input.app),
+      isPanel
+        ? "DO NOT COPY THE REFERENCE: the attached image is an all-over repeat; this piece is not. Never fill the whole canvas with motifs the way the reference does. Most of this piece is plain empty ground, exactly as the format above says; the decoration sits only where the format puts it."
+        : "DO NOT COPY THE REFERENCE: never reproduce its composition or its layout. Redraw every element from scratch, at the size and density this piece asks for.",
+      isPanel
+        ? "ROLE: inside the decorated areas, use the hero and supporting motifs of the reference at full size and full detail, in generous overlapping clusters; the undecorated areas are only the plain ground colour of the reference."
+        : (ROLE_GUIDANCE[input.role] ?? ROLE_GUIDANCE["coordenado"]),
+      "IDENTITY, keep it exactly: the same technique, the same drawing hand, the same palette, the same ground colour and the same kinds of motif as the reference. Do not introduce new colours or new kinds of motif.",
       technique,
       palette,
       RENDER_BLOCK,
