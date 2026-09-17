@@ -14,13 +14,7 @@ import { StepUsage } from "@/components/studio/flow/StepUsage";
 import { StepPrincipal } from "@/components/studio/flow/StepPrincipal";
 import { StepCollection } from "@/components/studio/flow/StepCollection";
 import { getApplication } from "@/lib/catalog";
-import {
-  coordinateAppsFor,
-  findTheme,
-  principalAppFor,
-  toggleAdjustment,
-  USAGES,
-} from "@/lib/studio-flow";
+import { coordinateAppsFor, findTheme, principalAppFor, USAGES } from "@/lib/studio-flow";
 import { getCollection, saveCollection, signPieceUrls } from "@/lib/api/collections.functions";
 import {
   cancelJob,
@@ -346,16 +340,25 @@ function StudioPage() {
     setJob(await readJob({ data: { collectionId: id } }));
   };
 
-  const handleAdjust = async (adjustmentId: string) => {
+  /** Refaz a principal com os ajustes marcados e, se houver, o pedido em palavras. */
+  const handleRedoPrincipal = async (next: string[], request: string) => {
     if (!collectionId) return;
-    const next = toggleAdjustment(adjustments, adjustmentId);
-    setAdjustmentsState(next);
-    setBusy("Aplicando o ajuste…");
     try {
+      if (request) {
+        // O pedido reescreve o prompt já com os ajustes antigos embutidos.
+        setBusy("Reescrevendo o prompt com o seu pedido…");
+        const written = await rewritePrompt({ data: { collectionId, request } });
+        setMasterPrompt(written.prompt);
+        setSummary(written.summary);
+        setPalette(written.palette);
+      }
+      setBusy("Aplicando os ajustes…");
       await persistAdjustments({ data: { collectionId, adjustments: next } });
+      setAdjustmentsState(next);
+      setBusy("Pintando a peça principal…");
       await repaintPrincipal(collectionId);
     } catch (err) {
-      fail(err, "Não foi possível aplicar o ajuste.");
+      fail(err, "Não foi possível refazer a peça principal.");
     } finally {
       setBusy(null);
     }
@@ -368,24 +371,6 @@ function StudioPage() {
       await repaintPrincipal(collectionId);
     } catch (err) {
       fail(err, "Não foi possível pintar de novo.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleRequest = async (request: string) => {
-    if (!collectionId) return;
-    setBusy("Reescrevendo o prompt com o seu pedido…");
-    try {
-      const written = await rewritePrompt({ data: { collectionId, request } });
-      setMasterPrompt(written.prompt);
-      setSummary(written.summary);
-      setPalette(written.palette);
-      setAdjustmentsState([]);
-      setBusy("Pintando a peça principal…");
-      await repaintPrincipal(collectionId);
-    } catch (err) {
-      fail(err, "Não foi possível aplicar o pedido.");
     } finally {
       setBusy(null);
     }
@@ -591,9 +576,8 @@ function StudioPage() {
           masterPrompt={masterPrompt}
           adjustments={adjustments}
           working={busy !== null || (jobActive && principal?.status === "gerando")}
-          onAdjust={(id) => void handleAdjust(id)}
+          onRedo={(adj, text) => void handleRedoPrincipal(adj, text)}
           onRetry={() => void handleRetryPrincipal()}
-          onRequest={(text) => void handleRequest(text)}
           onSavePrompt={(text) => void handleSavePrompt(text)}
           onPickVersion={(v) => void handlePickVersion(v)}
           onBack={() => setStep(3)}

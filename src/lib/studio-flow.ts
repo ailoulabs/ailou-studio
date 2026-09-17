@@ -269,6 +269,16 @@ export function coordinateAppsFor(applicationIds: string[]): string[] {
 export const PRINCIPAL_NAME = (id: string) => getApplication(id)?.name ?? "Estampa principal";
 
 /** Botões de ajuste da peça principal. Cada um vira um bloco em inglês. */
+export const ADJUSTMENT_GROUPS: { id: string; label: string }[] = [
+  { id: "estilo", label: "Estilo" },
+  { id: "acabamento", label: "Acabamento" },
+  { id: "cor", label: "Cores" },
+  { id: "escala", label: "Tamanho dos motivos" },
+  { id: "densidade", label: "Preenchimento" },
+  { id: "fundo", label: "Fundo" },
+  { id: "paleta", label: "Paleta" },
+];
+
 export interface Adjustment {
   id: string;
   label: string;
@@ -278,6 +288,62 @@ export interface Adjustment {
 }
 
 export const ADJUSTMENTS: Adjustment[] = [
+  // Estilo: o acabamento geral, calibrado nas coleções da Casa Criativa
+  // (aquarela realista sobre linho, muito respiro, paleta contida).
+  {
+    id: "estilo-clean",
+    label: "Clean",
+    group: "estilo",
+    en: "STYLE: clean and airy. About half of the canvas is plain ground; motifs are spaced calmly with generous breathing room, only two or three colours plus greens, nothing crowded, no fillers scattered everywhere. This replaces any density instruction above.",
+  },
+  {
+    id: "estilo-sofisticado",
+    label: "Sofisticado",
+    group: "estilo",
+    en: "STYLE: sophisticated and refined, in the manner of premium home-textile collections: realistic delicate rendering with soft natural shading and no outlines, a restrained palette of two or three colours plus greens, calm spacing with plain ground showing between motif groups, elegant restraint over abundance.",
+  },
+  {
+    id: "estilo-rustico",
+    label: "Rústico",
+    group: "estilo",
+    en: "STYLE: rustic farmhouse. Warm natural linen-coloured ground, earthy palette (olive, terracotta, mustard, denim blue), a hand-painted feel, with thin stripes or a small gingham check as the secondary language.",
+  },
+  {
+    id: "estilo-vintage",
+    label: "Vintage",
+    group: "estilo",
+    en: "STYLE: vintage. Aged cream ground, faded and muted colours as if printed decades ago, old-fashioned botanical drawing with small ornamental flourishes, a slight softness of worn print.",
+  },
+  {
+    id: "estilo-romantico",
+    label: "Romântico",
+    group: "estilo",
+    en: "STYLE: romantic. Soft pinks, powder blues and creams, blooming flowers with ribbons and bows woven between them, gentle light, delicate fine details.",
+  },
+  {
+    id: "estilo-ludico",
+    label: "Lúdico",
+    group: "estilo",
+    en: "STYLE: playful and cute. Rounded, simplified characters and objects with friendly expressions, soft cheerful pastel colours, small hearts and stars as fillers, made for children's and festive lines.",
+  },
+  {
+    id: "estilo-chic-escuro",
+    label: "Chic escuro",
+    group: "estilo",
+    en: "STYLE: modern dark chic. Deep charcoal or navy ground, large dramatic blooms and leaves in rich saturated colours with cream highlights, editorial elegance, few but generous motifs.",
+  },
+  {
+    id: "acabamento-linho",
+    label: "Linho visível",
+    group: "acabamento",
+    en: "FINISH: the ground shows a faint natural linen weave, like a printed cotton-linen fabric seen up close; the texture is very subtle and even, and the printed colours stay flat on top of it.",
+  },
+  {
+    id: "acabamento-liso",
+    label: "Liso",
+    group: "acabamento",
+    en: "FINISH: perfectly smooth flat ground with no fabric or paper texture at all.",
+  },
   {
     id: "mais-colorido",
     label: "Mais colorido",
@@ -292,13 +358,13 @@ export const ADJUSTMENTS: Adjustment[] = [
   },
   {
     id: "motivos-maiores",
-    label: "Motivos maiores",
+    label: "Maiores",
     group: "escala",
     en: "SCALE: draw the hero motifs larger, the biggest hero spanning about a third of the canvas, with fewer repetitions.",
   },
   {
     id: "motivos-menores",
-    label: "Motivos menores",
+    label: "Menores",
     group: "escala",
     en: "SCALE: draw every motif smaller, the biggest hero spanning about a sixth of the canvas, with more repetitions and finer detail.",
   },
@@ -316,19 +382,19 @@ export const ADJUSTMENTS: Adjustment[] = [
   },
   {
     id: "fundo-escuro",
-    label: "Fundo escuro",
+    label: "Escuro",
     group: "fundo",
     en: "GROUND OVERRIDE: paint the ground in a deep dark colour that suits the palette (navy, charcoal, bottle green or wine) and lighten the motifs so they read clearly on it.",
   },
   {
     id: "fundo-claro",
-    label: "Fundo claro",
+    label: "Claro",
     group: "fundo",
     en: "GROUND OVERRIDE: paint the ground in a light cream or soft white, with the motifs clearly darker than the ground.",
   },
   {
     id: "outra-paleta",
-    label: "Outras cores",
+    label: "Trocar as cores",
     group: "paleta",
     en: "PALETTE OVERRIDE: choose a different but equally harmonious palette for the same subject and technique, clearly distinct from the one described above.",
   },

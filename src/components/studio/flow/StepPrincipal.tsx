@@ -4,7 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { FlowPiece, FlowVersion } from "@/lib/flow-types";
-import { ADJUSTMENTS, buildPrincipalPrompt } from "@/lib/studio-flow";
+import {
+  ADJUSTMENT_GROUPS,
+  ADJUSTMENTS,
+  buildPrincipalPrompt,
+  toggleAdjustment,
+} from "@/lib/studio-flow";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -14,9 +19,9 @@ interface Props {
   masterPrompt: string;
   adjustments: string[];
   working: boolean;
-  onAdjust: (id: string) => void;
+  /** Refaz a principal com os ajustes marcados e, se houver, o pedido em palavras. */
+  onRedo: (adjustments: string[], request: string) => void;
   onRetry: () => void;
-  onRequest: (text: string) => void;
   onSavePrompt: (text: string) => void;
   onPickVersion: (version: FlowVersion) => void;
   onBack: () => void;
@@ -30,15 +35,15 @@ export function StepPrincipal({
   masterPrompt,
   adjustments,
   working,
-  onAdjust,
+  onRedo,
   onRetry,
-  onRequest,
   onSavePrompt,
   onPickVersion,
   onBack,
   onApprove,
 }: Props) {
   const [request, setRequest] = useState("");
+  const [pending, setPending] = useState<string[]>(adjustments);
   const [showPrompt, setShowPrompt] = useState(false);
   const [draft, setDraft] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -50,6 +55,11 @@ export function StepPrincipal({
   useEffect(() => {
     setDraft(finalPrompt);
   }, [finalPrompt]);
+
+  // Quando o servidor devolve os ajustes gravados, a seleção local acompanha.
+  useEffect(() => {
+    setPending(adjustments);
+  }, [adjustments]);
 
   useEffect(() => {
     if (!generating) {
@@ -63,6 +73,9 @@ export function StepPrincipal({
 
   const versions = piece?.versions ?? [];
   const dirty = draft.trim() !== finalPrompt.trim();
+  const sameSet = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((x) => b.includes(x));
+  const canRedo = !sameSet(pending, adjustments) || request.trim().length > 1;
 
   return (
     <section className="space-y-6">
@@ -170,62 +183,68 @@ export function StepPrincipal({
             </div>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Ajustes por toque
+              Ajustes
             </p>
-            <div className="flex flex-wrap gap-2">
-              {ADJUSTMENTS.map((a) => {
-                const on = adjustments.includes(a.id);
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    disabled={generating || !hasImage}
-                    onClick={() => onAdjust(a.id)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-sm transition disabled:opacity-50",
-                      on
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card hover:border-primary/60",
-                    )}
-                  >
-                    {a.label}
-                  </button>
-                );
-              })}
-              <button
+            {ADJUSTMENT_GROUPS.map((group) => (
+              <div key={group.id} className="flex flex-wrap items-center gap-2">
+                <span className="w-36 shrink-0 text-sm text-muted-foreground">{group.label}</span>
+                {ADJUSTMENTS.filter((a) => a.group === group.id).map((a) => {
+                  const on = pending.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      disabled={generating || !hasImage}
+                      onClick={() => setPending((prev) => toggleAdjustment(prev, a.id))}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-sm transition disabled:opacity-50",
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background hover:border-primary/60",
+                      )}
+                    >
+                      {a.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="space-y-1">
+              <span className="text-sm text-muted-foreground">Ou com suas palavras</span>
+              <Input
+                value={request}
+                onChange={(e) => setRequest(e.target.value)}
+                placeholder="Ex.: tirar as bananas e colocar mais hibiscos"
+                maxLength={400}
+                disabled={generating || !hasImage}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={generating || !masterPrompt}
                 onClick={onRetry}
-                className="rounded-full border border-dashed border-border bg-card px-3 py-1.5 text-sm transition hover:border-primary/60 disabled:opacity-50"
+                title="Pinta de novo com o mesmo prompt, sem mudar nada"
               >
                 Outra tentativa
-              </button>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={generating || !hasImage || !canRedo}
+                onClick={() => {
+                  onRedo(pending, request.trim());
+                  setRequest("");
+                }}
+              >
+                Refazer com estes ajustes
+              </Button>
             </div>
           </div>
-
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const text = request.trim();
-              if (!text) return;
-              onRequest(text);
-              setRequest("");
-            }}
-          >
-            <Input
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-              placeholder="Pedir uma mudança com suas palavras"
-              maxLength={400}
-              disabled={generating || !hasImage}
-            />
-            <Button type="submit" variant="outline" disabled={generating || !request.trim()}>
-              Aplicar
-            </Button>
-          </form>
 
           <div className="rounded-xl border border-border bg-card">
             <button
