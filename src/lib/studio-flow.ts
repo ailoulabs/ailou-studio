@@ -130,10 +130,18 @@ export interface Climate {
 
 export const CLIMATES: Climate[] = [
   {
+    id: "aquarela-realista",
+    name: "Aquarela realista",
+    hint: "pintada, com volume, sem contorno (padrão das lojas)",
+    en: "realistic botanical watercolour, PAINTED, NOT DRAWN. Absolutely no contour lines, no ink and no pencil anywhere: every form is built only from tonal washes, with soft gradations from light to shade, petals and leaves with real volume and translucency, subtle cast shading where they overlap, colours blended with soft edges. Botanically accurate, in the manner of a painted botanical plate and of premium printed home linens.",
+    swatch: ["#F6F0E4", "#C97C7C", "#7F9A73", "#B9A9C9"],
+    soft: true,
+  },
+  {
     id: "aquarela-delicada",
     name: "Aquarela delicada",
     hint: "lavada e leve, borda mole, muito fundo",
-    en: "loose watercolour. Soft wet-in-wet edges, visible pigment blooms and granulation, transparent layered washes, no black outlines, light pencil sketch lines showing under the paint in places.",
+    en: "loose watercolour, painted, not drawn: no contour lines, no ink and no pencil. Soft wet-in-wet edges, visible pigment blooms and granulation, transparent layered washes, light and airy, shapes defined only by the washes themselves.",
     swatch: ["#F8F2EC", "#D9A5A0", "#9DB59A", "#C9B8D6"],
     soft: true,
   },
@@ -155,7 +163,7 @@ export const CLIMATES: Climate[] = [
     id: "guache",
     name: "Guache opaco",
     hint: "fosco, pincelada visível, sem contorno",
-    en: "opaque gouache. Matte flat paint with visible brush edges, slightly uneven coverage, no outlines, colours mixed on the brush, a hand-painted poster feel.",
+    en: "opaque gouache, painted, not drawn: no contour lines, no ink and no pencil. Matte flat paint with visible brush edges, slightly uneven coverage, colours mixed on the brush, shapes defined by the brush strokes themselves, a hand-painted poster feel.",
     swatch: ["#F1EDE4", "#E07A5F", "#3D405B", "#81B29A"],
   },
   {
@@ -300,7 +308,7 @@ export const ADJUSTMENTS: Adjustment[] = [
     id: "estilo-sofisticado",
     label: "Sofisticado",
     group: "estilo",
-    en: "STYLE: sophisticated and refined, in the manner of premium home-textile collections: realistic delicate rendering with soft natural shading and no outlines, a restrained palette of two or three colours plus greens, calm spacing with plain ground showing between motif groups, elegant restraint over abundance.",
+    en: "STYLE: sophisticated and refined, in the manner of premium home-textile collections: realistic delicate rendering with tonal volume and soft natural shading, painted and never outlined or drawn (no contour lines, no ink, no pencil), a restrained palette of two or three colours plus greens, calm spacing with plain ground showing between motif groups, elegant restraint over abundance.",
   },
   {
     id: "estilo-rustico",
